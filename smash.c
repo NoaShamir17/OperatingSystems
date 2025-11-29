@@ -15,7 +15,11 @@
 /*=============================================================================
 * global variables & data structures
 =============================================================================*/
+Smash smash;
 char _line[CMD_LENGTH_MAX];
+
+smash.smash_pid = getpid();
+smash.prev_path = NULL;
 
 /*=============================================================================
 * main function
@@ -28,6 +32,7 @@ int main(int argc, char* argv[])
 		fgets(_line, CMD_LENGTH_MAX, stdin);
 		strcpy(_cmd, _line);
 		//execute command
+		
 
 		//initialize buffers for next command
 		_line[0] = '\0';
