@@ -7,6 +7,8 @@
 #include <stdio.h>
 #include <string.h> //Noa added
 #include <stdbool.h> //Noa added
+#include <unistd.h> //Noa added for getpid()
+
 
 #define CMD_LENGTH_MAX 120
 #define ARGS_NUM_MAX 20
@@ -51,11 +53,6 @@ typedef enum {
 	//feel free to add more values here or delete this
 } CommandResult;
 
-typedef enum {
-    FOREGROUND = 0,
-    BACKGROUND,
-    STOPPED
-} CommandStatus;
 
 //=============================================================
 // global structs/type definitions
@@ -64,14 +61,18 @@ typedef enum {
 typedef struct {
     char* cmd_name;
     int num_args;
-    char* args[ARGS_NUM_MAX];
+    char* args[ARGS_NUM_MAX]; //args[0] is command name
     bool internal;
-    CommandStatus status;
+    bool background;
+    Command *nxt_cmd;
+} Command;
+
+typedef struct {
+    Command* cmd;
     int pid;
     int job_id;
     int time_added_to_jobs;
-    Command *nxt_cmd;
-} Command;
+} Process;
 
 typedef struct {
     Command* jobs_list[JOBS_NUM_MAX];
@@ -83,9 +84,6 @@ typedef struct {
     char* prev_path;
     JobsList* jobs;
 } Smash;
-
-
-
 
 
 /*=============================================================================
