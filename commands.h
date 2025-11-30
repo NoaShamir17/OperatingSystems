@@ -42,9 +42,12 @@ static inline void* _validatedMalloc(size_t size)
 * error definitions
 =============================================================================*/
 typedef enum  {
-	INVALID_COMMAND = 0,
+    VALID_CMD = 0,
+	INVALID_CMD,
+    NULL_CMD,
+    MALLOC_FAIL
 	//feel free to add more values here or delete this
-} ParsingError;
+} ParsingResult;
 
 typedef enum {
 	SMASH_SUCCESS = 0,
@@ -61,7 +64,7 @@ typedef enum {
 typedef struct {
     char* cmd_name;
     int num_args;
-    char* args[ARGS_NUM_MAX]; //args[0] is command name
+    char* args[ARGS_NUM_MAX];
     bool internal;
     bool background;
     Command *nxt_cmd;
@@ -90,6 +93,9 @@ typedef struct {
 * global functions
 =============================================================================*/
 int parseCommandExample(char* line);
+bool isInternalCommand(char *cmd_name);
+void freeCommand(Command* cmd);
+void executeCommand(Command* cmd, Smash* smash);
 
 //=============================================================
 // internal commands sugnatures
