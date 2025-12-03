@@ -5,14 +5,32 @@
 =============================================================================*/
 #include <stdlib.h>
 #include <stdio.h>
-#include <string.h> //Noa added
-#include <stdbool.h> //Noa added
-#include <unistd.h> //Noa added for getpid()
+#include <string.h>
+#include <stdbool.h> 
+#include <unistd.h> 
+#include <errno.h> //TODO: is this needed?
+#include <time.h>
+#include <limits.h> //for PATH_MAX
 
 
 #define CMD_LENGTH_MAX 120
 #define ARGS_NUM_MAX 20
 #define JOBS_NUM_MAX 100
+
+
+typedef enum {
+    SHOWPID_CMD = 0,
+    PWD_CMD = 1,
+    CD_CMD = 2,
+    JOBS_CMD = 3,
+    KILL_CMD = 4,
+    FG_CMD = 5,
+    BG_CMD = 6,
+    QUIT_CMD = 7,
+    DIFF_CMD = 8,
+    // Explicit value for commands that are NOT internal
+    EXTERNAL_CMD = 9 
+} CmdNum;
 
 /*=============================================================================
 * error handling - some useful macros and examples of error handling,
@@ -64,8 +82,9 @@ typedef enum {
 typedef struct {
     char* cmd_name;
     int num_args;
-    char* args[ARGS_NUM_MAX];
+    char* args[ARGS_NUM_MAX+1]; //args[0] is the command name itself, last arg is NULL
     bool internal;
+    CmdNum cmd_num;
     bool background;
     Command *nxt_cmd;
 } Command;
@@ -75,30 +94,57 @@ typedef struct {
     int pid;
     int job_id;
     int time_added_to_jobs;
-} Process;
+    bool is_stopped;
+} Job;
 
 typedef struct {
-    Command* jobs_list[JOBS_NUM_MAX];
+    Job* jobs_list[JOBS_NUM_MAX];
     int jobs_count;
-} JobsList;
+    int next_job_id;
+} JobManager;
 
 typedef struct {
     int smash_pid;
     char* prev_path;
-    JobsList* jobs;
+    JobManager* job_manager;
 } Smash;
 
 
 /*=============================================================================
 * global functions
 =============================================================================*/
-int parseCommandExample(char* line);
-bool isInternalCommand(char *cmd_name);
+
+//--------------Command parsing and execution----------------
+int parseCommand(char* line);
+CmdNum getInternalCommandNum(char *cmd_name);
+//bool isInternalCommand(char *cmd_name);
 void freeCommand(Command* cmd);
 void executeCommand(Command* cmd, Smash* smash);
+void execExternalCommand(Command* cmd);
+CommandResult execInternalCommand(Command* cmd, Smash* smash);
+
+//--------------Internal commands----------------
+void showpidCommand(Command* cmd,Smash* smash);
+void pwdCommand(Command* cmd);
+
+
+
+//-------------Jobs list management----------------
+Job* CreateJob(Command* cmd, int pid);
+void addJob(Smash* smash, Job* job);
+void UpdateJobs(Smash* smash); 
+void RemoveJobByPid(JobManager* job_manager, int pid);
+void MarkJobAsStopped(JobManager* job_manager, int pid);
 
 //=============================================================
 // internal commands sugnatures
 //=============================================================
+
+
+//TODO:need to implement:
+//execInternalCommand
+//CreateJob
+//CheckJobs
+
 
 #endif //COMMANDS_H
