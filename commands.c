@@ -295,7 +295,36 @@ CommandResult cdCommand(Command* cmd, Smash* smash) {
 
 }
 
+CommandResult jobsCommand(Smash* smash) {
+    UpdateJobs(smash); // Always reap zombies before printing
+    PrintJobs(smash->job_manager);
+    return SMASH_SUCCESS;
+}
 
+void PrintJobs(JobManager* job_manager) {
+    for (int i = 0; i < JOBS_NUM_MAX; i++) {
+        Job* job = job_manager->jobs_list[i];
+        if (job != NULL) {
+            // Calculate elapsed time
+            time_t now = time(NULL);
+            double elapsed = difftime(now, job->time_added_to_jobs);
+            
+            // Format: [job_id] command [&] : pid <elapsed> secs (stopped)
+            // Added logic: (job->cmd->background ? " &" : "")
+            printf("[%d] %s%s: %d %.0f secs", 
+                   i, 
+                   job->cmd->cmd_name, 
+                   (job->cmd->background ? " &" : ""), // Conditionally adds " &"
+                   job->pid, 
+                   elapsed);
+                   
+            if (job->is_stopped) {
+                printf(" (stopped)");
+            }
+            printf("\n");
+        }
+    }
+}
 
 //=============================================================
 // Jobs list management implementations
