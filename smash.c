@@ -38,7 +38,10 @@ for(int i = 0; i < JOBS_NUM_MAX; i++){
 		printf("smash > ");
 		fgets(_line, CMD_LENGTH_MAX, stdin);
 		//execute command
-		Command* cmd = MALLOC_VALIDATED(Command, sizeof(Command));
+		Command* cmd = (Command*)calloc(1, sizeof(Command)); 
+		if (cmd == NULL) {
+			ERROR_EXIT("malloc failed");
+		}
 		switch(parseCmd(_line, cmd)) {
 			case VALID_CMD:
 				//command is valid, execute it

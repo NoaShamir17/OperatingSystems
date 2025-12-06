@@ -49,7 +49,7 @@ ParsingResult parseCmd(char* line, Command* cmd)
 		if(i >= 1  &&  strcmp(cmd->args[i],"&&") == 0){ //check for symbol '&&'
 			cmd->args[i] = NULL; //remove '&&' from args list
 			line = NULL; //next command to parse is after the &&
-			cmd->nxt_cmd = (Command*)malloc(sizeof(Command));
+			cmd->nxt_cmd = (Command*)calloc(1, sizeof(Command));
 			if(!cmd->nxt_cmd){
 				return MALLOC_FAIL;
 			}
