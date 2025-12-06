@@ -84,7 +84,7 @@ typedef struct Job Job;
 typedef struct JobManager JobManager;
 typedef struct Smash Smash;
 
-typedef struct {
+struct Command{
     char* cmd_name;
     int num_args;
     char* args[ARGS_NUM_MAX+1]; //args[0] is the command name itself, last arg is NULL
@@ -92,27 +92,27 @@ typedef struct {
     CmdNum cmd_num;
     bool background;
     Command *nxt_cmd;
-} Command;
+};
 
-typedef struct {
+struct Job{
     Command* cmd;
     int pid;
     int job_id;
     int time_added_to_jobs;
     bool is_stopped;
-} Job;
+} ;
 
-typedef struct {
+struct JobManager{
     Job* jobs_list[JOBS_NUM_MAX];
     int jobs_count;
     int next_job_id;
-} JobManager;
+};
 
-typedef struct {
+struct Smash{
     int smash_pid;
     char* prev_path;
     JobManager* job_manager;
-} Smash;
+};
 
 
 /*=============================================================================
@@ -166,4 +166,4 @@ void freeSmash(Smash* smash);
 //CheckJobs
 
 
-#endif //COMMANDS_H
+#endif
