@@ -94,14 +94,33 @@ CmdNum getInternalCommandNum(char *cmd_name) {
 // }
 
 void freeCommand(Command* cmd){
-	if(cmd->nxt_cmd != NULL){
-		freeCommand(cmd->nxt_cmd);
-	}
-	if(cmd->args[0] != NULL) free(cmd->args[0]);
-	for(int i = 0; i < cmd->num_args; i++){
-		if (cmd->args[i] != NULL) free(cmd->args[i]);
-	}
-	if(cmd != NULL) free(cmd);
+    if (cmd == NULL) return;
+
+    // 1. Recursively free next commands in the chain
+    if(cmd->nxt_cmd != NULL){
+        freeCommand(cmd->nxt_cmd);
+        cmd->nxt_cmd = NULL;
+    }
+
+    // 2. Free the command name (Missing in your original code)
+    if (cmd->cmd_name != NULL) {
+        free(cmd->cmd_name);
+        cmd->cmd_name = NULL;
+    }
+
+    // 3. Free ALL arguments (0 to num_args)
+    // args[0] is the command name copy, args[1..N] are arguments.
+    // Using ARGS_NUM_MAX ensures we catch everything, which is safer given 
+    // we use calloc/NULL pointers.
+    for(int i = 0; i < ARGS_NUM_MAX + 1; i++){
+        if (cmd->args[i] != NULL) {
+            free(cmd->args[i]);
+            cmd->args[i] = NULL;
+        }
+    }
+
+    // 4. Free the struct itself
+    free(cmd);
 }
 
 
