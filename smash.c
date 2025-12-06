@@ -18,22 +18,22 @@
 Smash smash;
 char _line[CMD_LENGTH_MAX];
 
-smash.smash_pid = getpid();
-smash.prev_path = NULL;
-smash.job_manager = MALLOC_VALIDATED(JobsList, sizeof(JobsList));
-smash.job_manager->jobs_count = 0;
-smash.job_manager->next_job_id = 0;
-//initiate all jobs to NULL
-for(int i = 0; i < JOBS_NUM_MAX; i++){
-	smash.job_manager->jobs_list[i] = NULL;
-}
+
 
 /*=============================================================================
 * main function
 =============================================================================*/
 int main(int argc, char* argv[])
 {
-	
+	smash.smash_pid = getpid();
+smash.prev_path = NULL;
+smash.job_manager = MALLOC_VALIDATED(JobManager, sizeof(JobManager));
+smash.job_manager->jobs_count = 0;
+smash.job_manager->next_job_id = 0;
+//initiate all jobs to NULL
+for(int i = 0; i < JOBS_NUM_MAX; i++){
+	smash.job_manager->jobs_list[i] = NULL;
+}
 	while(1) {
 		printf("smash > ");
 		fgets(_line, CMD_LENGTH_MAX, stdin);
