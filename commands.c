@@ -1,4 +1,5 @@
 //commands.c
+#define _XOPEN_SOURCE 500 // Enable POSIX extensions like setpgrp
 #include "commands.h"
 
 //example function for printing errors from internal commands
