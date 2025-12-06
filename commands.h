@@ -38,7 +38,7 @@ typedef enum {
 =============================================================================*/
 #define ERROR_EXIT(msg) \
     do { \
-        fprintf(stderr, "%s: %d\n%s", _FILE, __LINE_, msg); \
+        fprintf(stderr, "%s: %d\n%s", __FILE__, __LINE__, msg); \
         exit(1); \
     } while(0);
 
