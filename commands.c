@@ -175,10 +175,6 @@ void executeCommand(Command* cmd, Smash* smash){
 					//child process
 					execExternalCommand(cmd);
 				}
-				else{
-					//parent process
-					printf("%d\n", pid); //TODO: needed? 
-				}
 			}
 		}		
 	}
