@@ -42,7 +42,6 @@ for(int i = 0; i < JOBS_NUM_MAX; i++){
 		if (cmd == NULL) {
 			ERROR_EXIT("malloc failed");
 		}
-		printf("calloc worked\n");
 		switch(parseCmd(_line, cmd)) {
 			case VALID_CMD:
 				//command is valid, execute it
