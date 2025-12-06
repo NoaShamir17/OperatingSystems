@@ -754,7 +754,7 @@ void UpdateJobs(Smash* smash){
     // -1: wait for ANY child
     // WNOHANG: do not block
     // WUNTRACED: report stopped children as well
-    while ((pid = my_system_call(SYS_WAITPID,-1, &status, WNOHANG | WUNTRACED)) > 0) {
+    while ((pid = my_system_call(SYS_WAITPID,-1, &status, WNOHANG | WUNTRACED | WCONTINUED)) > 0) {
         
         // --- PID > 0: A job was successfully reaped ---
         
