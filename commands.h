@@ -120,7 +120,7 @@ struct Smash{
 =============================================================================*/
 
 //--------------Command parsing and execution----------------
-int parseCmd(char* line);
+ParsingResult parseCmd(char* line, Command* cmd);
 CmdNum getInternalCommandNum(char *cmd_name);
 //bool isInternalCommand(char *cmd_name);
 void freeCommand(Command* cmd);
