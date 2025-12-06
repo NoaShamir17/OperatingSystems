@@ -11,6 +11,8 @@
 #include <errno.h> //TODO: is this needed?
 #include <time.h>
 #include <limits.h> //for PATH_MAX
+#include <signal.h>
+#include <fcntl.h>
 #include "my_system_call.h"
 
 #define CMD_LENGTH_MAX 120
@@ -149,6 +151,7 @@ Job* CreateJob(Command* cmd, int pid);
 void addJob(Smash* smash, Job* job);
 void freeJob(Job* job);
 void RemoveJobByPid(JobManager* job_manager, int pid);
+void RemoveJobById(JobManager* job_manager, int job_id);
 void MarkJobAsStopped(JobManager* job_manager, int pid);
 Job* GetJobById(JobManager* job_manager, int job_id);
 Job* GetJobByPid(JobManager* job_manager, int pid);

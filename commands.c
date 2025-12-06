@@ -862,6 +862,30 @@ void RemoveJobByPid(JobManager* job_manager, int pid){
     }
 }
 
+void RemoveJobById(JobManager* job_manager, int job_id) {
+    // 1. Validate ID range
+    if (job_id < 0 || job_id >= JOBS_NUM_MAX) return;
+
+    // 2. Get the job pointer
+    Job* job = job_manager->jobs_list[job_id];
+
+    if (job != NULL) {
+        // 3. Free memory (using your existing helper)
+        freeJob(job);
+
+        // 4. Remove from list and update count
+        job_manager->jobs_list[job_id] = NULL;
+        job_manager->jobs_count--;
+
+        // 5. Update next_job_id
+        // If we freed a slot index smaller than the current "next" ID,
+        // then THIS slot is now the new smallest available ID.
+        if (job_id < job_manager->next_job_id) {
+            job_manager->next_job_id = job_id;
+        }
+    }
+}
+
 void MarkJobAsStopped(JobManager* job_manager, int pid){
 	Job* job = GetJobByPid(job_manager, pid);
     if (job != NULL) {
