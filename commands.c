@@ -21,14 +21,12 @@ void perrorSmash(const char* cmd, const char* msg)
 //fills the cmd structure by parsing the given line
 ParsingResult parseCmd(char* line, Command* cmd)
 {
-	printf("line is %s\n", line);
 	char* delimiters = " \t\n"; //parsing should be done by spaces, tabs or newlines
 	char* token = strtok(line, delimiters); //get first token
     if(!token)
         return NULL_CMD; //this means no tokens were found, i.e., empty command
     cmd->cmd_name = strdup(token);
     if (!cmd->cmd_name) return MALLOC_FAIL;
-	printf("cmd name is %s\n", cmd->cmd_name);
 	
 	//fill cmd structure
     cmd->background = false;
@@ -296,6 +294,8 @@ CommandResult cdCommand(Command* cmd, Smash* smash) {
             return SMASH_FAIL;
         }
         target_dir = smash->prev_path;
+        printf("%s\n", target_dir);
+
     }
 
     // Attempt to change directory
@@ -356,13 +356,17 @@ CommandResult killCommand(Command* cmd, Smash* smash) {
     char* signum_str = cmd->args[1];
     char* jobid_str = cmd->args[2];
 
+    if (!isNumber(signum_str) || !isNumber(jobid_str)) {
+        perrorSmash("kill", "invalid arguments");
+        return SMASH_FAIL;
+    }
     // 1. Parse signal number directly
     // We expect a raw number string (e.g. "9").
     int signum = atoi(signum_str); 
 
     // 2. Validate signal number
     // Must be positive. If user entered "-9", atoi returns -9, which is <= 0.
-    if (signum <= 0) {
+    if (signum < 0) {
         perrorSmash("kill", "invalid arguments");
         return SMASH_FAIL;
     }
@@ -371,7 +375,7 @@ CommandResult killCommand(Command* cmd, Smash* smash) {
     
     // 3. Verify job_id is valid
     // (job_id must be > 0, and verify it wasn't a parsing error)
-    if (job_id <= 0 && strcmp(jobid_str, "0") != 0) { 
+    if (job_id < 0) { 
         perrorSmash("kill", "invalid arguments");
         return SMASH_FAIL; 
     }
@@ -415,7 +419,7 @@ CommandResult fgCommand(Command* cmd, Smash* smash) {
         
     } else if (cmd->num_args == 1) {
         // Specific Job ID: Validate it is numeric
-        if (strspn(cmd->args[1], "0123456789") != strlen(cmd->args[1])) {
+        if (!isNumber(cmd->args[1])) {
              perrorSmash("fg", "invalid arguments");
              return SMASH_FAIL;
         }
@@ -505,7 +509,7 @@ CommandResult bgCommand(Command* cmd, Smash* smash) {
         job_id = max_stopped_id;
 
     } else if (cmd->num_args == 1) {
-        if (strspn(cmd->args[1], "0123456789") != strlen(cmd->args[1])) {
+        if (!isNumber(cmd->args[1])) {
              perrorSmash("bg", "invalid arguments");
              return SMASH_FAIL;
         }
@@ -949,11 +953,17 @@ void PrintJobs(JobManager* job_manager) {
             time_t now = time(NULL);
             double elapsed = difftime(now, job->time_added_to_jobs);
             
-            // Format: [job_id] command [&] : pid <elapsed> secs (stopped)
-            // Added logic: (job->cmd->background ? " &" : "")
-            printf("[%d] %s%s: %d %.0f secs", 
-                   i, 
-                   job->cmd->cmd_name, 
+            // --- 1. Print Job ID and Command Name ---
+            printf("[%d] %s", i, job->cmd->cmd_name);
+            
+            // --- 2. Print Arguments ---
+            // num_args is the count of arguments after cmd_name (index 1 to num_args)
+            for (int k = 1; k <= job->cmd->num_args; k++) {
+                printf(" %s", job->cmd->args[k]);
+            }
+            
+            // --- 3. Print Background Symbol, PID, Time, and Status ---
+            printf("%s: %d %.0f secs", 
                    (job->cmd->background ? " &" : ""), // Conditionally adds " &"
                    job->pid, 
                    elapsed);
@@ -990,4 +1000,19 @@ void freeSmash(Smash* smash) {
         free(smash->prev_path);
         smash->prev_path = NULL;
     }
+}
+
+//=============================================================
+// helpers implementations
+//=============================================================
+
+bool isNumber(const char* str) {
+    if (str == NULL || *str == '\0') {
+        return false; // Empty or NULL string is not a valid number
+    }
+    
+    // Check if the initial segment of 'str' consisting only of digits 
+    // is equal to the total length of 'str'.
+    // If they are equal, the string is entirely numeric.
+    return strspn(str, "0123456789") == strlen(str);
 }

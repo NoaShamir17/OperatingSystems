@@ -158,6 +158,9 @@ Job* GetJobByPid(JobManager* job_manager, int pid);
 void PrintJobs(JobManager* job_manager);
 void freeSmash(Smash* smash);
 
+//-------------Helpers----------------
+bool isNumber(const char* str);
+
 //=============================================================
 // internal commands sugnatures
 //=============================================================
