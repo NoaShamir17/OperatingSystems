@@ -20,7 +20,6 @@ void perrorSmash(const char* cmd, const char* msg)
 //fills the cmd structure by parsing the given line
 ParsingResult parseCmd(char* line, Command* cmd)
 {
-	ParsingResult result;
 	char* delimiters = " \t\n"; //parsing should be done by spaces, tabs or newlines
 	cmd->cmd_name = strtok(line, delimiters); 
 	if(!cmd->cmd_name)
