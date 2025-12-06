@@ -21,8 +21,10 @@ void perrorSmash(const char* cmd, const char* msg)
 //fills the cmd structure by parsing the given line
 ParsingResult parseCmd(char* line, Command* cmd)
 {
+	printf("line is %s", line);
 	char* delimiters = " \t\n"; //parsing should be done by spaces, tabs or newlines
-	cmd->cmd_name = strtok(line, delimiters); 
+	cmd->cmd_name = strdup(strtok(line, delimiters));
+	printf("cmd name is %s", cmd->cmd_name);
 	if(!cmd->cmd_name)
 		return NULL_CMD; //this means no tokens were found, i.e., empty command
 	
@@ -33,7 +35,7 @@ ParsingResult parseCmd(char* line, Command* cmd)
 	strcpy(cmd->args[0], cmd->cmd_name); //first arg is the command name itself
 	for(int i = 1; i < ARGS_NUM_MAX; i++)
 	{
-		cmd->args[i] = strtok(NULL, delimiters); //first arg NULL -> keep tokenizing from previous call
+		cmd->args[i] = strdup(strtok(NULL, delimiters)); //first arg NULL -> keep tokenizing from previous call
 		if(!cmd->args[i]){//no more args
 			if(i > 1  &&  strcmp(cmd->args[i-1],"&") == 0){ //check for background symbol '&'
 				cmd->background = true;
