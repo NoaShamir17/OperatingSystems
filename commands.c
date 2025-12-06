@@ -23,12 +23,15 @@ ParsingResult parseCmd(char* line, Command* cmd)
 {
 	printf("line is %s\n", line);
 	char* delimiters = " \t\n"; //parsing should be done by spaces, tabs or newlines
-	cmd->cmd_name = strdup(strtok(line, delimiters));
+	charRef token = strtok(line, delimiters); //get first token
+    if(!token)
+        return NULL_CMD; //this means no tokens were found, i.e., empty command
+    cmd->cmd_name = strdup(token);
+    if (!cmd->cmd_name) return MALLOC_FAIL;
 	printf("cmd name is %s\n", cmd->cmd_name);
-	if(!cmd->cmd_name)
-		return NULL_CMD; //this means no tokens were found, i.e., empty command
 	
 	//fill cmd structure
+    cmd->background = false;
 	cmd->cmd_num = getInternalCommandNum(cmd->cmd_name);
 	cmd->internal = !(cmd->cmd_num == EXTERNAL_CMD);
 	cmd->num_args = 0;
@@ -36,27 +39,28 @@ ParsingResult parseCmd(char* line, Command* cmd)
     cmd->args[0] = strdup(cmd->cmd_name);
 	for(int i = 1; i < ARGS_NUM_MAX; i++)
 	{
-		cmd->args[i] = strdup(strtok(NULL, delimiters)); //first arg NULL -> keep tokenizing from previous call
-		if(!cmd->args[i]){//no more args
+		token = strtok(NULL, delimiters);
+        //cmd->args[i] = strdup(token); //first arg NULL -> keep tokenizing from previous call
+		if(token == NULL){//no more args
 			if(i > 1  &&  strcmp(cmd->args[i-1],"&") == 0){ //check for background symbol '&'
 				cmd->background = true;
+                free(cmd->args[i-1]);
 				cmd->args[i-1] = NULL; //remove '&' from args list
                 cmd->num_args--; //do not count '&' as an argument
 			}
-			else{
-				cmd->background = false;
-			}
+			
 			break;
 		}
-
-		if(i >= 1  &&  strcmp(cmd->args[i],"&&") == 0){ //check for symbol '&&'
+        cmd->args[i] = strdup(token); //token is not NULL
+        if (!cmd->args[i]) return MALLOC_FAIL;
+		if(strcmp(cmd->args[i],"&&") == 0){ //check for symbol '&&'
+            free(cmd->args[i]);
 			cmd->args[i] = NULL; //remove '&&' from args list
-			line = NULL; //next command to parse is after the &&
 			cmd->nxt_cmd = (Command*)calloc(1, sizeof(Command));
 			if(!cmd->nxt_cmd){
 				return MALLOC_FAIL;
 			}
-			return parseCmd(line, cmd->nxt_cmd); //recursively parse next command
+			return parseCmd(NULL, cmd->nxt_cmd); //recursively parse next command
 		}
 		cmd->num_args++;
 
@@ -93,11 +97,11 @@ void freeCommand(Command* cmd){
 	if(cmd->nxt_cmd != NULL){
 		freeCommand(cmd->nxt_cmd);
 	}
-	free(cmd->cmd_name);
+	if(cmd->args[0] != NULL) free(cmd->args[0]);
 	for(int i = 0; i < cmd->num_args; i++){
-		free(cmd->args[i]);
+		if (cmd->args[i] != NULL) free(cmd->args[i]);
 	}
-	free(cmd);
+	if(cmd != NULL) free(cmd);
 }
 
 
