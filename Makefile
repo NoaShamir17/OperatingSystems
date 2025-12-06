@@ -4,6 +4,8 @@ SRCS = $(wildcard *.c)
 OBJS = $(SRCS:.c=.o)
 TARGET = smash
 
+gcc -std=c99 -g -Wall -Werror -pedantic-errors -DNDEBUG -pthread *.c my_system_call.o -o smash
+
 all: $(TARGET)
 
 $(TARGET): $(OBJS)
