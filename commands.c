@@ -23,7 +23,7 @@ ParsingResult parseCmd(char* line, Command* cmd)
 {
 	printf("line is %s\n", line);
 	char* delimiters = " \t\n"; //parsing should be done by spaces, tabs or newlines
-	charRef token = strtok(line, delimiters); //get first token
+	char token = strtok(line, delimiters); //get first token
     if(!token)
         return NULL_CMD; //this means no tokens were found, i.e., empty command
     cmd->cmd_name = strdup(token);
