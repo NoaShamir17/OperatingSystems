@@ -38,7 +38,7 @@ typedef enum {
 =============================================================================*/
 #define ERROR_EXIT(msg) \
     do { \
-        fprintf(stderr, "%s: %d\n%s", __FILE__, __LINE__, msg); \
+        fprintf(stderr, "%s: %d\n%s", _FILE, __LINE_, msg); \
         exit(1); \
     } while(0);
 
@@ -124,17 +124,31 @@ void execExternalCommand(Command* cmd);
 CommandResult execInternalCommand(Command* cmd, Smash* smash);
 
 //--------------Internal commands----------------
-void showpidCommand(Command* cmd,Smash* smash);
-void pwdCommand(Command* cmd);
+CommandResult showpidCommand(Command* cmd,Smash* smash);
+CommandResult pwdCommand(Command* cmd);
+CommandResult cdCommand(Command* cmd, Smash* smash);
+CommandResult jobsCommand(Command* cmd, Smash* smash);
+CommandResult killCommand(Command* cmd, Smash* smash);
+CommandResult fgCommand(Command* cmd, Smash* smash);
+CommandResult bgCommand(Command* cmd, Smash* smash);
+CommandResult quitCommand(Command* cmd, Smash* smash);
+CommandResult diffCommand(Command* cmd);
+
+
 
 
 
 //-------------Jobs list management----------------
+void UpdateJobs(Smash* smash); 
 Job* CreateJob(Command* cmd, int pid);
 void addJob(Smash* smash, Job* job);
-void UpdateJobs(Smash* smash); 
+void freeJob(Job* job);
 void RemoveJobByPid(JobManager* job_manager, int pid);
 void MarkJobAsStopped(JobManager* job_manager, int pid);
+Job* GetJobById(JobManager* job_manager, int job_id);
+Job* GetJobByPid(JobManager* job_manager, int pid);
+void PrintJobs(JobManager* job_manager);
+void freeSmash(Smash* smash);
 
 //=============================================================
 // internal commands sugnatures
@@ -147,4 +161,4 @@ void MarkJobAsStopped(JobManager* job_manager, int pid);
 //CheckJobs
 
 
-#endif //COMMANDS_H
+#endif //COMMANDS_H
