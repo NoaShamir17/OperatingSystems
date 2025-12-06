@@ -79,6 +79,11 @@ typedef enum {
 // global structs/type definitions
 //=============================================================
 
+typedef struct Command Command;
+typedef struct Job Job;
+typedef struct JobManager JobManager;
+typedef struct Smash Smash;
+
 typedef struct {
     char* cmd_name;
     int num_args;
