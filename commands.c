@@ -362,7 +362,7 @@ CommandResult pwdCommand(Command* cmd) {
 }
 
 CommandResult cdCommand(Command* cmd, Smash* smash) {
-    if (cmd->num_args > 1) {
+    if (cmd->num_args > 1 || cmd->num_args == 0) {
         perrorSmash("cd", "expected 1 arguments");
         return SMASH_FAIL;
     }
