@@ -246,13 +246,26 @@ void executeCommand(Command* cmd, Smash* smash){
                 smash->fg_pid = pid;
                 smash->fg_cmd = cmd;
                 smash->fg_job_id = -1;
-				my_system_call(SYS_WAITPID, pid, &status, WUNTRACED);
-				// CHECK THE CHILD'S EXIT STATUS
+                while (my_system_call(SYS_WAITPID, pid, &status, WUNTRACED) == -1) {
+                    if (errno == EINTR) {
+                        // We were interrupted (likely by Ctrl+Z handler).
+                        // Check if the child actually stopped. 
+                        // If we don't retry, we might miss the status update.
+                        continue;
+                    } else {
+                        // Genuine error
+                        perror("smash error: waitpid failed");
+                        break;
+                    }
+                }				
+                // CHECK THE CHILD'S EXIT STATUS
                 if (WIFSTOPPED(status)) {
                     // Child was stopped -> Add to Job List
                     Job* job = CreateJob(cmd, pid);
-                    job->is_stopped = true;
-                    addJob(smash, job);
+                    if (job) {
+                        job->is_stopped = true;
+                        addJob(smash, job);
+                    }
                 }
                 if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
                     cmd_result = SMASH_FAIL; 
