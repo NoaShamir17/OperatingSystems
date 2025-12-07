@@ -27,6 +27,7 @@ int main(int argc, char* argv[])
 {
 	smash.smash_pid = getpid();
 smash.prev_path = NULL;
+smash.alias_list = NULL;
 smash.job_manager = MALLOC_VALIDATED(JobManager, sizeof(JobManager));
 smash.job_manager->jobs_count = 0;
 smash.job_manager->next_job_id = 0;

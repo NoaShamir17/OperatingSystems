@@ -30,8 +30,10 @@ typedef enum {
     BG_CMD = 6,
     QUIT_CMD = 7,
     DIFF_CMD = 8,
-    // Explicit value for commands that are NOT internal
-    EXTERNAL_CMD = 9 
+    ALIAS_CMD = 9,
+    UNALIAS_CMD = 10,
+     // Explicit value for commands that are NOT internal
+    EXTERNAL_CMD = 11 
 } CmdNum;
 
 /*=============================================================================
@@ -85,6 +87,7 @@ typedef struct Command Command;
 typedef struct Job Job;
 typedef struct JobManager JobManager;
 typedef struct Smash Smash;
+typedef struct Alias Alias;
 
 struct Command{
     char* cmd_name;
@@ -114,6 +117,13 @@ struct Smash{
     int smash_pid;
     char* prev_path;
     JobManager* job_manager;
+    Alias* alias_list;
+};
+
+struct Alias {
+    char* alias_name;
+    struct Command* cmd_struct; // Stores the parsed command struct
+    struct Alias* next;
 };
 
 
@@ -141,6 +151,11 @@ CommandResult bgCommand(Command* cmd, Smash* smash);
 CommandResult quitCommand(Command* cmd, Smash* smash);
 CommandResult diffCommand(Command* cmd);
 
+//--------------Alias commands----------------
+CommandResult aliasCommand(Command* cmd, Smash* smash);
+CommandResult unaliasCommand(Command* cmd, Smash* smash);
+
+
 
 
 
@@ -160,6 +175,13 @@ void freeSmash(Smash* smash);
 
 //-------------Helpers----------------
 bool isNumber(const char* str);
+
+//--------------Alias list management----------------
+void freeAliases(Smash* smash);
+void addAlias(Smash* smash, char* name, char* command_str);
+Command* getAlias(Smash* smash, char* name);
+void removeAlias(Smash* smash, char* name);
+
 
 //=============================================================
 // internal commands sugnatures

@@ -19,58 +19,109 @@ void perrorSmash(const char* cmd, const char* msg)
 
 
 //fills the cmd structure by parsing the given line
-ParsingResult parseCmd(char* line, Command* cmd)
-{
-	char* delimiters = " \t\n"; //parsing should be done by spaces, tabs or newlines
-	char* token = strtok(line, delimiters); //get first token
-    if(!token)
-        return NULL_CMD; //this means no tokens were found, i.e., empty command
+ParsingResult parseCmd(char* line, Command* cmd) {
+    // --- Initialization ---
+    cmd->cmd_name = NULL;
+    cmd->nxt_cmd = NULL;
+    cmd->num_args = 0;
+    cmd->background = false;
+    for(int k=0; k < ARGS_NUM_MAX+1; k++) cmd->args[k] = NULL;
+
+    char* delimiters = " \t\n"; 
+    
+    // 1. Get First Token (Command Name)
+    char* token = strtok(line, delimiters); 
+    if(!token) return NULL_CMD; 
+    
     cmd->cmd_name = strdup(token);
     if (!cmd->cmd_name) return MALLOC_FAIL;
-	
-	//fill cmd structure
-    cmd->background = false;
-	cmd->cmd_num = getInternalCommandNum(cmd->cmd_name);
-	cmd->internal = !(cmd->cmd_num == EXTERNAL_CMD);
-	cmd->num_args = 0;
-	//strcpy(cmd->args[0], cmd->cmd_name); //first arg is the command name itself
+
+    cmd->cmd_num = getInternalCommandNum(cmd->cmd_name);
+    // Note: If you added ALIAS_CMD to enum, checking != EXTERNAL is safer
+    cmd->internal = (cmd->cmd_num != EXTERNAL_CMD);
+    
     cmd->args[0] = strdup(cmd->cmd_name);
-	for(int i = 1; i < ARGS_NUM_MAX; i++)
-	{
-		token = strtok(NULL, delimiters);
-        //cmd->args[i] = strdup(token); //first arg NULL -> keep tokenizing from previous call
-		if(token == NULL){//no more args
-			if(i > 1  &&  strcmp(cmd->args[i-1],"&") == 0){ //check for background symbol '&'
-				cmd->background = true;
-                free(cmd->args[i-1]);
-				cmd->args[i-1] = NULL; //remove '&' from args list
-                cmd->num_args--; //do not count '&' as an argument
-			}
-			
-			break;
-		}
-        cmd->args[i] = strdup(token); //token is not NULL
+    if(!cmd->args[0]) return MALLOC_FAIL;
+
+    // =========================================================
+    // SPECIAL ALIAS DEFINITION LOGIC
+    // =========================================================
+    if (strcmp(cmd->cmd_name, "alias") == 0) {
+        // Format: alias name='command'
+        // Current strtok position is right after "alias"
+        
+        // 2. Parse Alias Name (Delimiter is '=')
+        char* alias_name = strtok(NULL, "="); 
+        
+        if (alias_name) {
+            // Trim leading spaces from name if any (e.g. "alias  name=...")
+            while(*alias_name == ' ') alias_name++;
+            
+            cmd->args[1] = strdup(alias_name);
+            if (!cmd->args[1]) return MALLOC_FAIL;
+            cmd->num_args++;
+            
+            // 3. Parse Alias Value (Delimiters are quotes " or ')
+            // strtok skips leading delimiters, so it skips the opening quote
+            // and stops at the closing quote.
+            char* alias_val = strtok(NULL, "\"\'"); 
+            
+            if (alias_val) {
+                cmd->args[2] = strdup(alias_val);
+                if (!cmd->args[2]) return MALLOC_FAIL;
+                cmd->num_args++;
+                
+                // 4. CHECK FOR CHAINING (&&)
+                // Switch back to standard delimiters to see what's next
+                char* next_token = strtok(NULL, delimiters);
+                
+                if (next_token && strcmp(next_token, "&&") == 0) {
+                    // Chaining found!
+                    cmd->nxt_cmd = (Command*)calloc(1, sizeof(Command));
+                    if(!cmd->nxt_cmd) return MALLOC_FAIL;
+                    
+                    // Recursive call
+                    return parseCmd(NULL, cmd->nxt_cmd);
+                }
+            }
+        }
+        return VALID_CMD;
+    }
+    // =========================================================
+
+    // Standard Parsing Loop (for non-alias commands)
+    for(int i = 1; i < ARGS_NUM_MAX; i++) {
+        token = strtok(NULL, delimiters); 
+        
+        if(token == NULL) { 
+            // Check for background '&' at the end
+            if(i > 1 && strcmp(cmd->args[i-1], "&") == 0) { 
+                cmd->background = true;
+                free(cmd->args[i-1]); 
+                cmd->args[i-1] = NULL; 
+                cmd->num_args--; 
+            }
+            break;
+        }
+
+        if(strcmp(token, "&&") == 0) { 
+            // Chaining found in normal command
+            cmd->args[i] = NULL; 
+            cmd->nxt_cmd = (Command*)calloc(1, sizeof(Command));
+            if(!cmd->nxt_cmd) return MALLOC_FAIL;
+            return parseCmd(NULL, cmd->nxt_cmd); 
+        }
+        
+        cmd->args[i] = strdup(token);
         if (!cmd->args[i]) return MALLOC_FAIL;
-		if(strcmp(cmd->args[i],"&&") == 0){ //check for symbol '&&'
-            free(cmd->args[i]);
-			cmd->args[i] = NULL; //remove '&&' from args list
-			cmd->nxt_cmd = (Command*)calloc(1, sizeof(Command));
-			if(!cmd->nxt_cmd){
-				return MALLOC_FAIL;
-			}
-			return parseCmd(NULL, cmd->nxt_cmd); //recursively parse next command
-		}
-		cmd->num_args++;
-
-	}
-	cmd->args[cmd->num_args + 1] = NULL; //last arg is NULL (+1 bc args[0] is cmd name)
-
-	return VALID_CMD;
+        cmd->num_args++;
+    }
+    cmd->args[cmd->num_args + 1] = NULL; 
+    return VALID_CMD;
 }
 
 CmdNum getInternalCommandNum(char *cmd_name) {
-    const char* internal_cmds[] = {"showpid", "pwd", "cd", "jobs", "kill", "fg", "bg", "quit", "diff", NULL};
-    
+    const char* internal_cmds[] = {"showpid", "pwd", "cd", "jobs", "kill", "fg", "bg", "quit", "diff", "alias", "unalias", NULL};
     for(int i = 0; internal_cmds[i] != NULL; i++) {
         if(strcmp(cmd_name, internal_cmds[i]) == 0) {
             // Since the array index (i) matches the enum value (CmdNum), 
@@ -127,7 +178,50 @@ void executeCommand(Command* cmd, Smash* smash){
 	int pid;
 	int status;
 	CommandResult cmd_result = SMASH_SUCCESS;
-
+    // --- ALIAS CHECK -------------------
+    Command* alias_cmd = getAlias(smash, cmd->cmd_name);
+    
+    if (alias_cmd != NULL) {
+        // CASE 1: User typed "alias_name &" (Explicit Background)
+        if (cmd->background) {
+            int pid = my_system_call(SYS_FORK);
+            
+            if (pid == 0) {
+                // Child: Executes the alias logic
+                setpgrp();
+                
+                // We execute the alias in the foreground of this NEW child process.
+                // The child will wait for the alias to finish, then exit.
+                executeCommand(alias_cmd, smash);
+                
+                exit(0); // Child is done
+            } 
+            else if (pid > 0) {
+                // Parent: Add the alias job to the list
+                // This ensures "jobs" shows: [1] alias_name &
+                Job* job = CreateJob(cmd, pid);
+                addJob(smash, job);
+            }
+            else {
+                perrorSmash("fork", "failed");
+            }
+        } 
+        // CASE 2: User typed "alias_name" (Foreground)
+        else {
+            // Just run it. If the alias definition ITSELF has '&', 
+            // the recursive call will handle the fork there.
+            executeCommand(alias_cmd, smash);
+        }
+        
+        // Handle chaining for the ORIGINAL line (e.g. "alias && echo done")
+        // Note: Without changing executeCommand to return a value, 
+        // we assume success and proceed.
+        if(cmd->nxt_cmd != NULL) {
+            executeCommand(cmd->nxt_cmd, smash);
+        }
+        return; // Return early
+    }
+    // -----------------------------------
 	if(!cmd->background && cmd->internal){
 		//foreground & internal
 		cmd_result = execInternalCommand(cmd, smash);
@@ -231,6 +325,10 @@ CommandResult execInternalCommand(Command* cmd, Smash* smash){
             return quitCommand(cmd, smash);
         case DIFF_CMD:
             return diffCommand(cmd);
+        case ALIAS_CMD:
+            return aliasCommand(cmd, smash);
+        case UNALIAS_CMD:
+            return unaliasCommand(cmd, smash);
         default:
             ERROR_EXIT("execInternalCommand: invalid internal command number\n");
     }
@@ -742,6 +840,30 @@ CommandResult diffCommand(Command* cmd) {
     }
 }
 
+CommandResult aliasCommand(Command* cmd, Smash* smash) {
+    if (cmd->num_args == 0) {
+        printAliases(smash);
+        return SMASH_SUCCESS;
+    }
+    // Validation
+    if (cmd->num_args < 2 || !cmd->args[1] || !cmd->args[2]) {
+        perrorSmash("alias", "invalid alias format");
+        return SMASH_FAIL;
+    }
+    // args[1] is name, args[2] is value (already parsed by parseCmd)
+    addAlias(smash, cmd->args[1], cmd->args[2]);
+    return SMASH_SUCCESS;
+}
+
+CommandResult unaliasCommand(Command* cmd, Smash* smash) {
+    if (cmd->num_args != 1) {
+        perrorSmash("unalias", "expected 1 arguments");
+        return SMASH_FAIL;
+    }
+    removeAlias(smash, cmd->args[1]);
+    return SMASH_SUCCESS;
+}
+
 //=============================================================
 // Jobs list management implementations
 //=============================================================
@@ -996,6 +1118,8 @@ void freeSmash(Smash* smash) {
         free(smash->prev_path);
         smash->prev_path = NULL;
     }
+    // 3. Clean up Aliases
+    freeAliases(smash);
 }
 
 //=============================================================
@@ -1012,3 +1136,85 @@ bool isNumber(const char* str) {
     // If they are equal, the string is entirely numeric.
     return strspn(str, "0123456789") == strlen(str);
 }
+
+//=============================================================
+// Alias implementations
+//=============================================================
+
+
+// Helper to free a list of aliases
+void freeAliases(Smash* smash) {
+    Alias* current = smash->alias_list;
+    while (current != NULL) {
+        Alias* temp = current;
+        current = current->next;
+        free(temp->alias_name);
+        freeCommand(temp->cmd_struct); // Free the stored struct
+        free(temp);
+    }
+    smash->alias_list = NULL;
+}
+
+// Add or Replace an Alias
+void addAlias(Smash* smash, char* name, char* command_str) {
+    Alias* current = smash->alias_list;
+    // Check replacement
+    while (current != NULL) {
+        if (strcmp(current->alias_name, name) == 0) {
+            freeCommand(current->cmd_struct);
+            // Re-parse the new string into a struct
+            current->cmd_struct = (Command*)calloc(1, sizeof(Command));
+            char* cmd_copy = strdup(command_str);
+            parseCmd(cmd_copy, current->cmd_struct);
+            free(cmd_copy);
+            return;
+        }
+        current = current->next;
+    }
+    // Create new
+    Alias* new_alias = (Alias*)malloc(sizeof(Alias));
+    if (!new_alias) { perrorSmash("alias", "malloc failed"); return; }
+    
+    new_alias->alias_name = strdup(name);
+    new_alias->cmd_struct = (Command*)calloc(1, sizeof(Command));
+    
+    char* cmd_copy = strdup(command_str);
+    parseCmd(cmd_copy, new_alias->cmd_struct); // Compile string to struct
+    free(cmd_copy);
+
+    new_alias->next = smash->alias_list;
+    smash->alias_list = new_alias;
+}
+
+// Retrieve the stored Command struct for a given name
+Command* getAlias(Smash* smash, char* name) {
+    if (!smash->alias_list || !name) return NULL;
+    Alias* current = smash->alias_list;
+    while (current != NULL) {
+        if (strcmp(current->alias_name, name) == 0) {
+            return current->cmd_struct;
+        }
+        current = current->next;
+    }
+    return NULL;
+}
+
+void removeAlias(Smash* smash, char* name) {
+    Alias* current = smash->alias_list;
+    Alias* prev = NULL;
+    while (current != NULL) {
+        if (strcmp(current->alias_name, name) == 0) {
+            if (prev == NULL) smash->alias_list = current->next;
+            else prev->next = current->next;
+            
+            free(current->alias_name);
+            freeCommand(current->cmd_struct);
+            free(current);
+            return; 
+        }
+        prev = current;
+        current = current->next;
+    }
+    perrorSmash("unalias", "alias does not exist");
+}
+
