@@ -203,7 +203,7 @@ void executeCommand(Command* cmd, Smash* smash){
                 addJob(smash, job);
             }
             else {
-                perrorSmash("fork", "failed");
+                perror("smash error: fork failed\n");
             }
         } 
         // CASE 2: User typed "alias_name" (Foreground)
@@ -229,7 +229,7 @@ void executeCommand(Command* cmd, Smash* smash){
 	else{
 		pid =my_system_call(SYS_FORK);
 		if (pid < 0){
-			ERROR_EXIT("fork failed\n");//TODO: is this the desired error handling?
+			ERROR_EXIT("smash error: fork failed\n");
 		}
 		else if (pid == 0){setpgrp();} //new process group
 		
@@ -481,7 +481,7 @@ CommandResult killCommand(Command* cmd, Smash* smash) {
     }
 
     if (my_system_call(SYS_KILL, job->pid, signum) == -1) {
-        perrorSmash("kill", "job cannot be signaled");
+        perror("smash error: kill failed");
         return SMASH_FAIL;
     }
     
@@ -554,7 +554,7 @@ CommandResult fgCommand(Command* cmd, Smash* smash) {
     // If the job was stopped, send SIGCONT to wake it up
     if (job->is_stopped) {
         if (my_system_call(SYS_KILL, job->pid, SIGCONT) == -1) {
-            perrorSmash("fg", "kill failed");
+            perror("smash error: kill failed");
             return SMASH_FAIL;
         }
         job->is_stopped = false;
@@ -565,7 +565,7 @@ CommandResult fgCommand(Command* cmd, Smash* smash) {
     int pid = job->pid;
 
     if (my_system_call(SYS_WAITPID, pid, &status, WUNTRACED) == -1) {
-        perror("waitpid failed");
+        perror("smash error: waitpid failed");
         return SMASH_FAIL;
     }
 
@@ -642,7 +642,7 @@ CommandResult bgCommand(Command* cmd, Smash* smash) {
     printf("\n");
 
     if (my_system_call(SYS_KILL, job->pid, SIGCONT) == -1) {
-        perrorSmash("bg", "kill failed");
+        perror("smash error: kill failed");
         return SMASH_FAIL;
     }
     
@@ -683,7 +683,10 @@ CommandResult quitCommand(Command* cmd, Smash* smash) {
                 // 1. Send SIGTERM
                 printf("sending SIGTERM... ");
                 fflush(stdout); // Force print before waiting
-                my_system_call(SYS_KILL, job->pid, SIGTERM);
+                if(my_system_call(SYS_KILL, job->pid, SIGTERM) == -1) {
+                    perror("smash error: kill failed");
+                    continue; // Proceed to next job
+                }
 
                 // 2. Wait up to 5 seconds
                 bool terminated = false;
@@ -693,7 +696,11 @@ CommandResult quitCommand(Command* cmd, Smash* smash) {
                 while (difftime(time(NULL), start_time) < 5) {
                     // Check if process has terminated (reap it if so)
                     pid_t result = my_system_call(SYS_WAITPID, job->pid, &status, WNOHANG);
-                    
+                    if(result == -1) {
+                        perror("smash error: waitpid failed");
+                        break; // Exit the loop on error
+                    }
+
                     if (result == job->pid) {
                         terminated = true;
                         break;
@@ -708,8 +715,9 @@ CommandResult quitCommand(Command* cmd, Smash* smash) {
                     // Timeout reached (5 sec passed)
                     // Format from image: "... sending SIGTERM... sending SIGKILL... done"
                     printf("sending SIGKILL... done\n");
-                    my_system_call(SYS_KILL, job->pid, SIGKILL);
-                }
+                    if (my_system_call(SYS_KILL, job->pid, SIGKILL) == -1) {
+                        perror("smash error: kill failed");
+                    }
             }
         }
     }
