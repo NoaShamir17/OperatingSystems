@@ -175,7 +175,8 @@ void freeCommand(Command* cmd){
 
 void executeCommand(Command* cmd, Smash* smash){
 	UpdateJobs(smash); //update jobs list before executing new command
-	int pid;
+	smash->stop_internal_cmd = false; // Reset flag before executing command
+    int pid;
 	int status;
 	CommandResult cmd_result = SMASH_SUCCESS;
     // --- ALIAS CHECK -------------------
@@ -241,14 +242,27 @@ void executeCommand(Command* cmd, Smash* smash){
 			}
 			else{
 				//parent process
-				my_system_call(SYS_WAITPID, pid, &status, 0);
+                //set the signal handlers for the foreground process
+                smash->fg_pid = pid;
+                smash->fg_cmd = cmd;
+                smash->fg_job_id = -1;
+				my_system_call(SYS_WAITPID, pid, &status, WUNTRACED);
 				// CHECK THE CHILD'S EXIT STATUS
-            if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
-                cmd_result = SMASH_FAIL; 
-            } else if (WIFSIGNALED(status)) {
-                // If killed by signal, treat as failure
-                cmd_result = SMASH_FAIL;
-            }
+                if (WIFSTOPPED(status)) {
+                    // Child was stopped -> Add to Job List
+                    Job* job = CreateJob(cmd, pid);
+                    job->is_stopped = true;
+                    addJob(smash, job);
+                }
+                if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
+                    cmd_result = SMASH_FAIL; 
+                } else if (WIFSIGNALED(status)) {
+                    // If killed by signal, treat as failure
+                    cmd_result = SMASH_FAIL;
+                }
+                // Reset foreground tracking variables
+                smash->fg_pid = 0;
+                smash->fg_cmd = NULL;
 			}
 		}
 		else{
@@ -561,11 +575,21 @@ CommandResult fgCommand(Command* cmd, Smash* smash) {
     }
 
     // 4. Wait (BLOCKING)
+
+    // Set foreground tracking variables
+    smash->fg_pid = job->pid;
+    smash->fg_cmd = job->cmd;
+    smash->fg_job_id = job_id;
+
     int status;
     int pid = job->pid;
 
     if (my_system_call(SYS_WAITPID, pid, &status, WUNTRACED) == -1) {
         perror("smash error: waitpid failed");
+        // IMPORTANT: Reset on error too!
+        smash->fg_pid = 0;
+        smash->fg_cmd = NULL;
+        smash->fg_job_id = -1;
         return SMASH_FAIL;
     }
 
@@ -577,6 +601,11 @@ CommandResult fgCommand(Command* cmd, Smash* smash) {
         RemoveJobById(smash->job_manager, job_id);
     }
 
+    // Reset foreground tracking variables
+    smash->fg_pid = 0;
+    smash->fg_cmd = NULL;
+    smash->fg_job_id = -1;
+    
     return SMASH_SUCCESS;
 }
 
@@ -674,6 +703,11 @@ CommandResult quitCommand(Command* cmd, Smash* smash) {
         
         
         for (int i = 0; i < JOBS_NUM_MAX; i++) {
+            // --- INTERRUPT CHECK 1 (Outer Loop) ---
+            if (smash->stop_internal_cmd) {
+                return SMASH_FAIL; // Stop killing and do NOT exit
+            }
+
             Job* job = smash->job_manager->jobs_list[i];
             
             if (job != NULL) {
@@ -694,6 +728,11 @@ CommandResult quitCommand(Command* cmd, Smash* smash) {
                 int status;
 
                 while (difftime(time(NULL), start_time) < 5) {
+
+                    // --- INTERRUPT CHECK 2 (Inner Wait Loop) ---
+                    if (smash->stop_internal_cmd) {
+                        return SMASH_FAIL; // Stop waiting and return
+                    }
                     // Check if process has terminated (reap it if so)
                     pid_t result = my_system_call(SYS_WAITPID, job->pid, &status, WNOHANG);
                     if(result == -1) {
@@ -723,6 +762,12 @@ CommandResult quitCommand(Command* cmd, Smash* smash) {
         }
     }
 
+    // --- CRITICAL CHECK ---
+    // Only exit if we were NOT interrupted
+    if (smash->stop_internal_cmd) {
+        return SMASH_FAIL;
+    }
+    
     // --- CLEANUP MEMORY (Anti-Leak) ---
     freeSmash(smash);    
     freeCommand(cmd);    
@@ -733,7 +778,7 @@ CommandResult quitCommand(Command* cmd, Smash* smash) {
     return SMASH_QUIT; 
 }
 
-CommandResult diffCommand(Command* cmd) {
+CommandResult diffCommand(Command* cmd, Smash* smash) {
     // 1. Check Argument Count
     if (cmd->num_args != 2) {
         perrorSmash("diff", "expected 2 arguments");
@@ -808,6 +853,13 @@ CommandResult diffCommand(Command* cmd) {
     int same = 1;
 
     while (1) {
+        //handle kill signal
+        if (smash->stop_internal_cmd) {
+            my_system_call(SYS_CLOSE, fd1);
+            my_system_call(SYS_CLOSE, fd2);
+            return SMASH_FAIL; 
+        }
+
         r1 = my_system_call(SYS_READ, fd1, &c1, 1);
         r2 = my_system_call(SYS_READ, fd2, &c2, 1);
 

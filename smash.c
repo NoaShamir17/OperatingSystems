@@ -35,6 +35,17 @@ smash.job_manager->next_job_id = 0;
 for(int i = 0; i < JOBS_NUM_MAX; i++){
 	smash.job_manager->jobs_list[i] = NULL;
 }
+
+	//set signal handlers
+	// --- INIT SIGNALS ---
+	smash.fg_pid = 0;
+	smash.fg_cmd = NULL;
+	smash.fg_job_id = -1;
+	smash.stop_internal_cmd = false;
+
+	my_system_call(SYS_SIGNAL, SIGTSTP, ctrlZHandler);
+	my_system_call(SYS_SIGNAL, SIGINT, ctrlCHandler);
+	// --------------------
 	while(1) {
 		printf("smash > ");
 		fgets(_line, CMD_LENGTH_MAX, stdin);

@@ -118,6 +118,10 @@ struct Smash{
     char* prev_path;
     JobManager* job_manager;
     Alias* alias_list;
+    int fg_pid;             // PID of foreground process (0 if none)
+    struct Command* fg_cmd; // Pointer to foreground command struct
+    int fg_job_id;          // Job ID if brought from list (or -1)
+    bool stop_internal_cmd; // Flag to interrupt diff/quit
 };
 
 struct Alias {
