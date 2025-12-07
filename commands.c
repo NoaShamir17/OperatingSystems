@@ -619,6 +619,7 @@ CommandResult fgCommand(Command* cmd, Smash* smash) {
     if (WIFSTOPPED(status)) {
         //by Ctrl+Z
         job->is_stopped = true;
+        job->time_added_to_jobs = time(NULL);
     } else {
         RemoveJobById(smash->job_manager, job_id);
     }
@@ -735,6 +736,10 @@ CommandResult quitCommand(Command* cmd, Smash* smash) {
             if (job != NULL) {
                 // Print format: [job_id] command - 
                 printf("[%d] %s - ", job->job_id, job->cmd->cmd_name);
+                // Print all arguments
+                for (int j = 1; j <= job->cmd->num_args; j++) {
+                    printf(" %s", job->cmd->args[j]);
+                }
                 
                 // 1. Send SIGTERM
                 printf("sending SIGTERM... ");
