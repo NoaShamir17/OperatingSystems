@@ -718,6 +718,7 @@ CommandResult quitCommand(Command* cmd, Smash* smash) {
                     if (my_system_call(SYS_KILL, job->pid, SIGKILL) == -1) {
                         perror("smash error: kill failed");
                     }
+                }
             }
         }
     }
