@@ -153,7 +153,7 @@ CommandResult killCommand(Command* cmd, Smash* smash);
 CommandResult fgCommand(Command* cmd, Smash* smash);
 CommandResult bgCommand(Command* cmd, Smash* smash);
 CommandResult quitCommand(Command* cmd, Smash* smash);
-CommandResult diffCommand(Command* cmd);
+CommandResult diffCommand(Command* cmd, Smash* smash);
 
 //--------------Alias commands----------------
 CommandResult aliasCommand(Command* cmd, Smash* smash);

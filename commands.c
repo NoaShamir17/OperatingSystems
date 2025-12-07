@@ -338,7 +338,7 @@ CommandResult execInternalCommand(Command* cmd, Smash* smash){
         case QUIT_CMD:
             return quitCommand(cmd, smash);
         case DIFF_CMD:
-            return diffCommand(cmd);
+            return diffCommand(cmd, smash);
         case ALIAS_CMD:
             return aliasCommand(cmd, smash);
         case UNALIAS_CMD:
@@ -605,7 +605,7 @@ CommandResult fgCommand(Command* cmd, Smash* smash) {
     smash->fg_pid = 0;
     smash->fg_cmd = NULL;
     smash->fg_job_id = -1;
-    
+
     return SMASH_SUCCESS;
 }
 
