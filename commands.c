@@ -597,14 +597,23 @@ CommandResult fgCommand(Command* cmd, Smash* smash) {
     int status;
     int pid = job->pid;
 
-    if (my_system_call(SYS_WAITPID, pid, &status, WUNTRACED) == -1) {
-        perror("smash error: waitpid failed");
-        // IMPORTANT: Reset on error too!
-        smash->fg_pid = 0;
-        smash->fg_cmd = NULL;
-        smash->fg_job_id = -1;
-        return SMASH_FAIL;
-    }
+
+    while (my_system_call(SYS_WAITPID, pid, &status, WUNTRACED) == -1) {
+        if (errno == EINTR) {
+            // We were interrupted (likely by Ctrl+Z handler).
+            // Check if the child actually stopped. 
+            // If we don't retry, we might miss the status update.
+            continue;
+        } else {
+            // Genuine error
+            perror("smash error: waitpid failed");
+            // IMPORTANT: Reset on error too!
+            smash->fg_pid = 0;
+            smash->fg_cmd = NULL;
+            smash->fg_job_id = -1;
+            return SMASH_FAIL;
+        }
+    }	
 
     // 5. Handle Status
     if (WIFSTOPPED(status)) {
