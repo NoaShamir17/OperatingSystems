@@ -841,10 +841,7 @@ CommandResult diffCommand(Command* cmd) {
 }
 
 CommandResult aliasCommand(Command* cmd, Smash* smash) {
-    if (cmd->num_args == 0) {
-        printAliases(smash);
-        return SMASH_SUCCESS;
-    }
+    
     // Validation
     if (cmd->num_args < 2 || !cmd->args[1] || !cmd->args[2]) {
         perrorSmash("alias", "invalid alias format");
