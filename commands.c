@@ -735,11 +735,12 @@ CommandResult quitCommand(Command* cmd, Smash* smash) {
             
             if (job != NULL) {
                 // Print format: [job_id] command - 
-                printf("[%d] %s - ", job->job_id, job->cmd->cmd_name);
+                printf("[%d] %s", job->job_id, job->cmd->cmd_name);
                 // Print all arguments
                 for (int j = 1; j <= job->cmd->num_args; j++) {
                     printf(" %s", job->cmd->args[j]);
                 }
+                printf(" - ");
                 
                 // 1. Send SIGTERM
                 printf("sending SIGTERM... ");
