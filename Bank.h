@@ -6,11 +6,11 @@
 #include "LockRW.h"
 
 class Bank {
-private:
+public:
     std::map<int, Account*> accounts; // Map ID -> Account*
     std::map<int, ATM*> atms;         // Map ID -> ATM* [cite: 34]
     LockRW bankLock; // Protects the map structure (Open/Close account) [cite: 268]
-    
+private:
     int bankVaultILS;
     int bankVaultUSD;
     LockRW vaultLock; // Protects the bank's own profits
