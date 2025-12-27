@@ -3,31 +3,38 @@
 
 #include "LockRW.h"
 
+// Mode indicators for locking
+#define WRITER_MODE true
+#define READER_MODE false
+
 class Account {
 private:
-    int id;
-    int password;
-    int balanceILS;
-    int balanceUSD;
+
     
     // Reader-Writer lock specifically for this account 
     LockRW accountLock; 
 
 public:
+    // Account details
+    int id;
+    int password;
+    int balanceILS;
+    int balanceUSD;
+
+    // Constructor & Destructor
     Account(int id, int password, int initILS, int initUSD);
     ~Account();
 
     // Getters require read locks, Setters/Actions require write locks
-    int getId() const { return id; }
     bool checkPassword(int pwd);
     
     // Core Actions (Thread Safe internally)
-    void deposit(int amount, bool isILS); // [cite: 60]
-    bool withdraw(int amount, bool isILS); // [cite: 61]
-    void getBalance(int &ils, int &usd);   // [cite: 62]
+    void deposit(int amount, bool isILS); 
+    bool withdraw(int amount, bool isILS); 
+    void getBalance(int &ils, int &usd);  
     
     // For Bank Commission (VIP/System use)
-    void takeCommission(double percentage); // [cite: 75]
+    void takeCommission(double percentage); 
     
     // Helper to lock the account explicitly (e.g. for Transfer)
     // Be careful with deadlocks here!
