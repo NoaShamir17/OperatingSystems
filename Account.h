@@ -10,7 +10,6 @@
 class Account {
 private:
 
-    
     // Reader-Writer lock specifically for this account 
     LockRW accountLock; 
 
@@ -23,15 +22,18 @@ public:
 
     // Constructor & Destructor
     Account(int id, int password, int initILS, int initUSD);
+    Account(const Account& other);
     ~Account();
+    
+    Account& operator=(const Account& other);
 
     // Getters require read locks, Setters/Actions require write locks
     bool checkPassword(int pwd);
     
-    // Core Actions (Thread Safe internally)
-    void deposit(int amount, bool isILS); 
-    bool withdraw(int amount, bool isILS); 
-    void getBalance(int &ils, int &usd);  
+    // // Core Actions (Thread Safe internally)
+    // void deposit(int amount, bool isILS); 
+    // bool withdraw(int amount, bool isILS); 
+    // void getBalance(int &ils, int &usd);  
     
     // For Bank Commission (VIP/System use)
     void takeCommission(double percentage); 
