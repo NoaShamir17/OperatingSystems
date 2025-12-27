@@ -35,7 +35,8 @@ public:
     // bool withdraw(int amount, bool isILS); 
     // void getBalance(int &ils, int &usd);  
     
-    // For Bank Commission (VIP/System use)
+    // For Bank Commission
+    // Deducts commission from the account balance and prints to log
     void takeCommission(double percentage); 
     
     // Helper to lock the account explicitly (e.g. for Transfer)
