@@ -18,10 +18,10 @@ public:
     LockRW();
     ~LockRW();
 
-    void readLock();
-    void readUnlock();
-    void writeLock();
-    void writeUnlock();
+    void readEnter();
+    void readExit();
+    void writeEnter();
+    void writeExit();
 };
 
 #endif
