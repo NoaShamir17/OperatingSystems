@@ -54,7 +54,7 @@ void ATM::run() {
         if (line.empty()) continue;
 
         // 2. Check for VIP Command
-        [cite_start]// "ATM... will write it to a special data structure... Bank will create special threads" [cite: 206-207]
+        // "ATM... will write it to a special data structure... Bank will create special threads"
         bool isVIP = (line.find("VIP") != std::string::npos);
 
         if (isVIP) {
@@ -67,8 +67,6 @@ void ATM::run() {
         // 3. Execute Standard Command
         processCommand(line);
 
-        // NOTE: Per instructions, no implicit sleep(1) here.
-        // Sleep only happens if the specific command is 'S' (Sleep).
     }
     
     file.close();
