@@ -48,7 +48,9 @@ void LockRW::writeExit() {
     writerActive = false;
     // Broadcast to readers or signal one writer. 
     // Generally, let writers fight or wake all readers.
-    pthread_cond_broadcast(&writeCond); 
-    pthread_cond_broadcast(&readCond);
+    if(writersWaiting > 0)
+        pthread_cond_signal(&writeCond); 
+    else
+        pthread_cond_broadcast(&readCond);
     pthread_mutex_unlock(&mutex);
 }
