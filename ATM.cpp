@@ -464,6 +464,95 @@ bool ATM::processCommand(const std::string& line) {
             return true;
         }
 
+        // -------------------------------------------------------
+        // I: Investment
+        // Format: I <id> <pass> <amount> <currency> <time_in_msec>
+        // -------------------------------------------------------
+        case 'I': { 
+            int timeMillis;
+            ss >> accountId >> password >> amount >> currencyStr >> timeMillis;
+
+            // --- LOCKING & CHECKS START ---
+            Bank::getInstance().lockBank(READER_MODE);
+            Account* acc = Bank::getInstance().getAccount(accountId);
+
+            if (!acc) {
+                logError("Error " + std::to_string(id) + ": Your transaction failed - account id " + std::to_string(accountId) + " does not exist");
+                Bank::getInstance().unlockBank(READER_MODE);
+                return false;
+            }
+
+            acc->lockAccount(WRITER_MODE);
+
+            if (!acc->checkPassword(password)) {
+                 logError("Error " + std::to_string(id) + ": Your transaction failed - password for account id " + std::to_string(accountId) + " is incorrect");
+                 acc->unlockAccount(WRITER_MODE);
+                 Bank::getInstance().unlockBank(READER_MODE);
+                 return false;
+            }
+
+            // Check funds and deduct immediately
+            bool hasFunds = false;
+            if (currencyStr == "ILS") {
+                if (acc->balanceILS >= amount) {
+                    acc->balanceILS -= amount;
+                    hasFunds = true;
+                }
+            } else { // USD
+                if (acc->balanceUSD >= amount) {
+                    acc->balanceUSD -= amount;
+                    hasFunds = true;
+                }
+            }
+
+            if (!hasFunds) {
+                 logError("Error " + std::to_string(id) + ": Your transaction failed - account id " + std::to_string(accountId) + 
+                          " balance is " + std::to_string(acc->balanceILS) + " ILS and " + 
+                          std::to_string(acc->balanceUSD) + " USD is lower than " + 
+                          std::to_string(amount) + " " + currencyStr);
+                 
+                 acc->unlockAccount(WRITER_MODE);
+                 Bank::getInstance().unlockBank(READER_MODE);
+                 return false;
+            }
+            // --- CHECKS END ---
+
+            // --- THREAD CREATION ---
+            
+            // 1. Pack arguments onto the HEAP
+            // We use 'new' because the local variables will die when this case ends.
+            InvestmentData* args = new InvestmentData;
+            args->atmId = id;
+            args->accountId = accountId;
+            args->amount = amount;
+            args->currency = currencyStr;
+            args->timeMillis = timeMillis;
+
+            // 2. Create the thread
+            pthread_t investment_thread;
+            if (pthread_create(&investment_thread, NULL, investmentRoutine, (void*)args) != 0) {
+                // If thread creation fails, we must refund the money!
+                if (currencyStr == "ILS") acc->balanceILS += amount;
+                else acc->balanceUSD += amount;
+                
+                delete args; // Clean up the struct since the thread won't
+                logError("Error " + std::to_string(id) + ": System error - failed to create investment thread");
+                
+                acc->unlockAccount(WRITER_MODE);
+                Bank::getInstance().unlockBank(READER_MODE);
+                return false;
+            }
+
+            // 3. Detach the thread
+            // This tells the OS "I don't care about joining this thread, just clean it up when it finishes."
+            pthread_detach(investment_thread);
+
+            acc->unlockAccount(WRITER_MODE);
+            Bank::getInstance().unlockBank(READER_MODE);
+
+            return true;
+        }
+
         default:
             return false;
     }
@@ -478,4 +567,62 @@ void ATM::logSuccess(const std::string& msg) {
 
 void ATM::logError(const std::string& msg) {
     LogFile::getInstance().write(msg);
+}
+
+//---------------------------------------------------------------------------
+// helper routines for I (investment) command - not 
+//--------------------------------------------------------------------------
+
+// Data structure to pass multiple arguments to the investment thread
+struct InvestmentData {
+    int atmId;
+    int accountId;
+    int amount;
+    std::string currency;
+    int timeMillis;
+};
+
+// Helper function for the investment thread
+void* investmentRoutine(void* arg) {
+    // 1. Unpack and Free Memory
+    // We must copy the data to local variables and delete the struct immediately
+    InvestmentData* data = (InvestmentData*)arg;
+    int atmId = data->atmId;
+    int accountId = data->accountId;
+    int amount = data->amount;
+    std::string currency = data->currency;
+    int timeMillis = data->timeMillis;
+    delete data; // CRITICAL: Free the heap memory we allocated in the main thread
+
+    // 2. Sleep
+    usleep(timeMillis * 1000); // usleep takes microseconds
+
+    // 3. Calculate Return
+    // Formula: amount * 1.03^time
+    double factor = std::pow(1.03, timeMillis); 
+    int finalAmount = std::round(amount * factor);
+
+    // 4. Re-acquire Locks (Standard "Existence Guarantee" pattern)
+    Bank::getInstance().lockBank(READER_MODE);
+    Account* acc = Bank::getInstance().getAccount(accountId);
+
+    // 5. Update Account
+    if (acc) {
+        acc->lockAccount(WRITER_MODE);
+        
+        if (currency == "ILS") {
+            acc->balanceILS += finalAmount;
+        } else {
+            acc->balanceUSD += finalAmount;
+        }
+        
+        // Optional: Log completion here if required by debug/verbose flags
+        // logSuccess("Investment completed..."); 
+
+        acc->unlockAccount(WRITER_MODE);
+    }
+    
+    Bank::getInstance().unlockBank(READER_MODE);
+    
+    return NULL;
 }

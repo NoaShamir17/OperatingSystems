@@ -29,6 +29,12 @@ public:
 
     // The function passed to pthread_create
     static void* startRoutine(void* arg);
+    // Data structure to pass multiple arguments to the investment thread
+    struct InvestmentData;
+
+
+    // Investment command helper
+    void investmentRoutine(int atmId, int accountId, int amount, std::string currency, int timeMillis);
 
     // The main loop
     void run();
