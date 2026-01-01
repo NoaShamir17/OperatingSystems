@@ -2,8 +2,12 @@
 #define BANK_H
 
 #include <map>
-#include "Account.h"
+
 #include "LockRW.h"
+#include "Account.h"
+#include "ATM.h"
+
+#define DOLLAR_TO_ILS_RATE 5 // 1 USD = 5 ILS
 
 
 

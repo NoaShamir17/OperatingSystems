@@ -5,6 +5,9 @@
 #include <pthread.h>
 #include <vector>
 
+#include "Bank.h"
+
+
 class ATM {
 private:
     int id;

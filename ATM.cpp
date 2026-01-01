@@ -388,6 +388,82 @@ bool ATM::processCommand(const std::string& line) {
             return true;
         }
 
+        // -------------------------------------------------------
+        // X: Exchange currency
+        // Format: X <id> <pass> <src> "to" <dst> <amount>
+        // -------------------------------------------------------
+        case 'X': { 
+            std::string sourceCurrency, toWord, targetCurrency;
+            
+            // 1. Parse arguments: <id> <pass> <src> "to" <dst> <amount>
+            ss >> accountId >> password >> sourceCurrency >> toWord >> targetCurrency >> amount;
+            
+            // 2. Lock Bank (Reader) - Guarantee account existence
+            Bank::getInstance().lockBank(READER_MODE);
+            Account* acc = Bank::getInstance().getAccount(accountId);
+
+            // 3. Existence Check
+            if (!acc) {
+                logError("Error " + std::to_string(id) + ": Your transaction failed - account id " + std::to_string(accountId) + " does not exist");
+                Bank::getInstance().unlockBank(READER_MODE);
+                return false;
+            }
+
+            // 4. Lock Account (Writer) - We are modifying balances
+            acc->lockAccount(WRITER_MODE);
+
+            // 5. Password Check
+            if (!acc->checkPassword(password)) {
+                 logError("Error " + std::to_string(id) + ": Your transaction failed - password for account id " + std::to_string(accountId) + " is incorrect");
+                 acc->unlockAccount(WRITER_MODE);
+                 Bank::getInstance().unlockBank(READER_MODE);
+                 return false;
+            }
+
+            // 6. Check Funds and Perform Exchange
+            bool enoughFunds = false;
+            if (sourceCurrency == "ILS") {
+                if (acc->balanceILS >= amount) {
+                    enoughFunds = true;
+                    acc->balanceILS -= amount;
+                    acc->balanceUSD += (amount / DOLLAR_TO_ILS_RATE); // integer division (check your specs!)
+                }
+            } else { // Source is USD
+                if (acc->balanceUSD >= amount) {
+                    enoughFunds = true;
+                    acc->balanceUSD -= amount;
+                    acc->balanceILS += (amount * DOLLAR_TO_ILS_RATE);
+                }
+            }
+
+            // 7. Handle Insufficient Funds
+            if (!enoughFunds) {
+                // Must print current balances of both currencies according to spec
+                 logError("Error " + std::to_string(id) + ": Your transaction failed - account id " + std::to_string(accountId) + 
+                          " balance is " + std::to_string(acc->balanceILS) + " ILS and " + 
+                          std::to_string(acc->balanceUSD) + " USD is lower than " + 
+                          std::to_string(amount) + " " + sourceCurrency);
+                 
+                 acc->unlockAccount(WRITER_MODE);
+                 Bank::getInstance().unlockBank(READER_MODE);
+                 return false;
+            }
+
+            // 8. Log Success
+            // Format: <ATM ID>: Account <id> new balance is <ILS> ILS and <USD> USD after <amt> <cur> was exchanged
+            std::stringstream msg;
+            msg << id << ": Account " << accountId << " new balance is " << acc->balanceILS 
+                << " ILS and " << acc->balanceUSD << " USD after " << amount << " " 
+                << sourceCurrency << " was exchanged";
+            logSuccess(msg.str());
+
+            // 9. Unlock
+            acc->unlockAccount(WRITER_MODE);
+            Bank::getInstance().unlockBank(READER_MODE);
+
+            return true;
+        }
+
         default:
             return false;
     }
