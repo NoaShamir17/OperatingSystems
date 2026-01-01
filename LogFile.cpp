@@ -3,7 +3,7 @@
 
 LogFile::LogFile() {
     pthread_mutex_init(&writeMutex, NULL);
-    logStream.open("log.txt", std::ofstream::out | std::ofstream::app);
+    logStream.open("log.txt", std::ofstream::out | std::ofstream::app); 
 }
 
 LogFile::~LogFile() {

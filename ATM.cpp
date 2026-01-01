@@ -42,7 +42,7 @@ void* ATM::startRoutine(void* arg) {
 void ATM::run() {
     std::ifstream file(inputFilePath.c_str());
     if (!file.is_open()) {
-        std::cerr << "Bank error: illegal arguments" << std::endl; [cite_start]// [cite: 277]
+        std::cerr << "Bank error: illegal arguments" << std::endl; 
         return;
     }
 
@@ -138,12 +138,13 @@ bool ATM::processCommand(const std::string& line) {
             int balILS = acc->balanceILS;
             int balUSD = acc->balanceUSD;
 
-            acc->unlockAccount(WRITER_MODE);
 
             std::stringstream msg;
             msg << id << ": Account " << accountId << " new balance is " << balILS 
                 << " ILS and " << balUSD << " USD after " << amount << " " << currencyStr << " was deposited";
             logSuccess(msg.str());
+            acc->unlockAccount(WRITER_MODE);
+
             return true;
         }
 
