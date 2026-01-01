@@ -18,7 +18,7 @@ Account::Account(int id, int password, int initILS, int initUSD)
 // --------------------------------------------------------------------------
 // Copy Constructor
 // --------------------------------------------------------------------------
-AAccount::Account(const Account& other) 
+Account::Account(const Account& other) 
     : id(other.id),                   // Copy the ID
       password(other.password),       // Copy the Password
       balanceILS(other.balanceILS),   // Copy the Balance

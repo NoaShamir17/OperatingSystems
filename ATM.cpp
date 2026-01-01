@@ -116,10 +116,12 @@ bool ATM::processCommand(const std::string& line) {
         case 'D': { 
             ss >> accountId >> password >> amount >> currencyStr;
             bool isILS = (currencyStr == "ILS");
-
+            //lock the Bank for reading
+            Bank::getInstance().lockBank(READER_MODE);
             Account* acc = Bank::getInstance().getAccount(accountId);
             if (!acc) {
                 logError("Error " + std::to_string(id) + ": Your transaction failed - account id " + std::to_string(accountId) + " does not exist");
+                Bank::getInstance().unlockBank(READER_MODE);
                 return false;
             }
 
@@ -129,6 +131,7 @@ bool ATM::processCommand(const std::string& line) {
             if (!acc->checkPassword(password)) {
                  logError("Error " + std::to_string(id) + ": Your transaction failed - password for account id " + std::to_string(accountId) + " is incorrect");
                  acc->unlockAccount(WRITER_MODE);
+                Bank::getInstance().unlockBank(READER_MODE);
                  return false;
             }
             
@@ -144,6 +147,7 @@ bool ATM::processCommand(const std::string& line) {
                 << " ILS and " << balUSD << " USD after " << amount << " " << currencyStr << " was deposited";
             logSuccess(msg.str());
             acc->unlockAccount(WRITER_MODE);
+            Bank::getInstance().unlockBank(READER_MODE);
 
             return true;
         }
@@ -156,9 +160,11 @@ bool ATM::processCommand(const std::string& line) {
             ss >> accountId >> password >> amount >> currencyStr;
             bool isILS = (currencyStr == "ILS");
 
+            Bank::getInstance().lockBank(READER_MODE);
             Account* acc = Bank::getInstance().getAccount(accountId);
             if (!acc) {
                 logError("Error " + std::to_string(id) + ": Your transaction failed - account id " + std::to_string(accountId) + " does not exist");
+                Bank::getInstance().unlockBank(READER_MODE);
                 return false;
             }
 
@@ -167,6 +173,7 @@ bool ATM::processCommand(const std::string& line) {
             if (!acc->checkPassword(password)) {
                  logError("Error " + std::to_string(id) + ": Your transaction failed - password for account id " + std::to_string(accountId) + " is incorrect");
                  acc->unlockAccount(WRITER_MODE);
+                 Bank::getInstance().unlockBank(READER_MODE);
                  return false;
             }
 
@@ -178,21 +185,22 @@ bool ATM::processCommand(const std::string& line) {
                     << amount << " " << currencyStr;
                 logError(msg.str());
                 acc->unlockAccount(WRITER_MODE);
+                Bank::getInstance().unlockBank(READER_MODE);
                 return false;
             }
 
             if (isILS) acc->balanceILS -= amount;
             else       acc->balanceUSD -= amount;
 
-            int balILS = acc->balanceILS;
-            int balUSD = acc->balanceUSD;
-
-            acc->unlockAccount(WRITER_MODE);
 
             std::stringstream msg;
-            msg << id << ": Account " << accountId << " new balance is " << balILS 
-                << " ILS and " << balUSD << " USD after " << amount << " " << currencyStr << " was withdrawn";
+            msg << id << ": Account " << accountId << " new balance is " << acc->balanceILS
+                << " ILS and " << acc->balanceUSD << " USD after " << amount << " " << currencyStr << " was withdrawn";
             logSuccess(msg.str());
+
+            acc->unlockAccount(WRITER_MODE);
+            Bank::getInstance().unlockBank(READER_MODE);
+
             return true;
         }
 
@@ -202,9 +210,12 @@ bool ATM::processCommand(const std::string& line) {
         // -------------------------------------------------------
         case 'B': { 
             ss >> accountId >> password;
+            
+            Bank::getInstance().lockBank(READER_MODE);
             Account* acc = Bank::getInstance().getAccount(accountId);
             if (!acc) {
                  logError("Error " + std::to_string(id) + ": Your transaction failed - account id " + std::to_string(accountId) + " does not exist");
+                 Bank::getInstance().unlockBank(READER_MODE);
                  return false;
             }
             
@@ -214,17 +225,19 @@ bool ATM::processCommand(const std::string& line) {
             if (!acc->checkPassword(password)) {
                  logError("Error " + std::to_string(id) + ": Your transaction failed - password for account id " + std::to_string(accountId) + " is incorrect");
                  acc->unlockAccount(READER_MODE);
+                 Bank::getInstance().unlockBank(READER_MODE);
                  return false;
             }
             
-            int balILS = acc->balanceILS;
-            int balUSD = acc->balanceUSD;
+
             
-            acc->unlockAccount(READER_MODE);
 
             std::stringstream msg;
-            msg << id << ": Account " << accountId << " balance is " << balILS << " ILS and " << balUSD << " USD";
+            msg << id << ": Account " << accountId << " balance is " << acc->balanceILS << " ILS and " << acc->balanceUSD << " USD";
             logSuccess(msg.str());
+
+            acc->unlockAccount(READER_MODE);
+            Bank::getInstance().unlockBank(READER_MODE);
             return true;
         }
 
@@ -236,15 +249,19 @@ bool ATM::processCommand(const std::string& line) {
             ss >> accountId >> password >> targetId >> amount >> currencyStr;
             bool isILS = (currencyStr == "ILS");
 
+            Bank::getInstance().lockBank(READER_MODE);
+
             Account* src = Bank::getInstance().getAccount(accountId);
             Account* dst = Bank::getInstance().getAccount(targetId);
 
             if (!src) {
                 logError("Error " + std::to_string(id) + ": Your transaction failed - account id " + std::to_string(accountId) + " does not exist");
+                Bank::getInstance().unlockBank(READER_MODE);
                 return false;
             }
             if (!dst) {
                 logError("Error " + std::to_string(id) + ": Your transaction failed - account id " + std::to_string(targetId) + " does not exist");
+                Bank::getInstance().unlockBank(READER_MODE);
                 return false;
             }
 
@@ -259,6 +276,7 @@ bool ATM::processCommand(const std::string& line) {
                 logError("Error " + std::to_string(id) + ": Your transaction failed - password for account id " + std::to_string(accountId) + " is incorrect");
                 second->unlockAccount(WRITER_MODE);
                 first->unlockAccount(WRITER_MODE);
+                Bank::getInstance().unlockBank(READER_MODE);
                 return false;
             }
 
@@ -271,6 +289,7 @@ bool ATM::processCommand(const std::string& line) {
                  logError(msg.str());
                  second->unlockAccount(WRITER_MODE);
                  first->unlockAccount(WRITER_MODE);
+                 Bank::getInstance().unlockBank(READER_MODE);
                  return false;
             }
 
@@ -283,21 +302,18 @@ bool ATM::processCommand(const std::string& line) {
                 dst->balanceUSD += amount;
             }
 
-            // Capture state for logging
-            int sBalILS = src->balanceILS;
-            int sBalUSD = src->balanceUSD;
-            int dBalILS = dst->balanceILS;
-            int dBalUSD = dst->balanceUSD;
-
-            second->unlockAccount(WRITER_MODE);
-            first->unlockAccount(WRITER_MODE);
 
             std::stringstream msg;
             msg << id << ": Transfer " << amount << " " << currencyStr 
                 << " from account " << accountId << " to account " << targetId 
-                << " new account balance is " << sBalILS << " ILS and " << sBalUSD << " USD"
-                << " new target account balance is " << dBalILS << " ILS and " << dBalUSD << " USD";
+                << " new account balance is " << src->balanceILS << " ILS and " << src->balanceUSD << " USD"
+                << " new target account balance is " << dst->balanceILS << " ILS and " << dst->balanceUSD << " USD";
             logSuccess(msg.str());
+
+            second->unlockAccount(WRITER_MODE);
+            first->unlockAccount(WRITER_MODE);
+            Bank::getInstance().unlockBank(READER_MODE);
+
             return true;
         }
 
@@ -307,9 +323,13 @@ bool ATM::processCommand(const std::string& line) {
         // -------------------------------------------------------
         case 'Q': {
             ss >> accountId >> password;
+
+            //lock the Bank for writing
+            Bank::getInstance().lockBank(WRITER_MODE);
             Account* acc = Bank::getInstance().getAccount(accountId);
             if (!acc) {
                 logError("Error " + std::to_string(id) + ": Your transaction failed - account id " + std::to_string(accountId) + " does not exist");
+                Bank::getInstance().unlockBank(WRITER_MODE);
                 return false;
             }
 
@@ -318,6 +338,7 @@ bool ATM::processCommand(const std::string& line) {
             if (!acc->checkPassword(password)) {
                 logError("Error " + std::to_string(id) + ": Your transaction failed - password for account id " + std::to_string(accountId) + " is incorrect");
                 acc->unlockAccount(READER_MODE);
+                Bank::getInstance().unlockBank(WRITER_MODE);
                 return false;
             }
             int savedILS = acc->balanceILS;
@@ -329,10 +350,12 @@ bool ATM::processCommand(const std::string& line) {
                 std::stringstream msg;
                 msg << id << ": Account " << accountId << " is now closed. Balance was " << savedILS << " ILS and " << savedUSD << " USD";
                 logSuccess(msg.str());
+                Bank::getInstance().unlockBank(WRITER_MODE);
                 return true;
             } else {
                 // If failed here, likely race condition deleted it already
                 logError("Error " + std::to_string(id) + ": Your transaction failed - account id " + std::to_string(accountId) + " does not exist"); 
+                Bank::getInstance().unlockBank(WRITER_MODE);
                 return false;
             }
         }
@@ -343,7 +366,6 @@ bool ATM::processCommand(const std::string& line) {
         // -------------------------------------------------------
         case 'C': {
             ss >> targetId;
-            [cite_start]// "ATM will ask the bank to close the ATM" [cite: 144]
             // Bank Printer thread executes this request later.
             Bank::getInstance().requestCloseATM(id, targetId);
             return true; 

@@ -4,8 +4,6 @@
 #include "LockRW.h"
 
 // Mode indicators for locking
-#define WRITER_MODE true
-#define READER_MODE false
 
 class Account {
 private:

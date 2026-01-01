@@ -5,6 +5,8 @@
 #include "Account.h"
 #include "LockRW.h"
 
+
+
 class Bank {
 public:
     std::map<int, Account*> accounts; // Map ID -> Account*
@@ -17,7 +19,7 @@ private:
 
     bool isWorking; // Flag for threads
     pthread_t commissionThread;
-    pthread_t printerThread;
+    pthread_t statusThread; //prints status periodically, updates status history, handles ATM close requests
 
     // Singleton instance
     Bank(); 
@@ -26,20 +28,35 @@ public:
     static Bank& getInstance();
     ~Bank();
 
-    // Account Management
+    //----------------lock Management--------------------------
+    void lockBank(bool writeMode);
+    void unlockBank(bool writeMode);
+
+    //----------------Account Management--------------------------
 
     // Returns true if successful, false if account ID already exists
-    bool openAccount(int id, int pass, int initILS, int initUSD); // [cite: 58]
+    // BankLock Write Lock DOES NOT need to be held internally
+    bool openAccount(int id, int pass, int initILS, int initUSD); 
 
     // Returns true if successful, false if account doesn't exist or wrong password
-    bool closeAccount(int id, int pass); // [cite: 59]
+    // BankLock Write Lock DOES NOT need to be held internally
+    bool closeAccount(int id, int pass); 
     Account* getAccount(int id); // Helper to find account
+
+    //----------------ATM Management--------------------------
+
+    // Request to close an ATM (called by ATM)
+    // The actual closing is handled by the Bank's status thread
+    // uses ATM::close()
+    void requestCloseATM(int requesterId, int targetId);
+
+    //----------------Thread Routines--------------------------
 
     // Bank Commission Loop (Thread function)
     static void* commissionRoutine(void* arg); // [cite: 74]
     
     // Status Printer Loop (Thread function)
-    static void* printerRoutine(void* arg); // [cite: 240]
+    static void* statusRoutine(void* arg);
 
     // System control
     void run();
