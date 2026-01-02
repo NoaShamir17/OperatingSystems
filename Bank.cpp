@@ -23,11 +23,6 @@ void Bank::unlockBank(bool writeMode) {
 }
 
 
-
-// Ensure you initialize the mutex in your Constructor (Bank::Bank())
-// pthread_mutex_init(&historyMutex, NULL); 
-// And destroy it in Destructor ~Bank()
-
 // --------------------------------------------------------------------------
 // Take Snapshot (Atomic View)
 // --------------------------------------------------------------------------
