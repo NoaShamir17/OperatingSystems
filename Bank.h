@@ -26,9 +26,6 @@ public:
     std::map<int, ATM*> atms;         // Map ID -> ATM* 
     LockRW bankLock; // Protects the map structure (Open/Close account)
 private:
-    int bankVaultILS;
-    int bankVaultUSD;
-    LockRW vaultLock; // Protects the bank's own profits
 
     bool isWorking; // Flag for threads
     pthread_t commissionThread;
