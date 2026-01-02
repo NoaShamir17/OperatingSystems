@@ -2,7 +2,10 @@
 #define BANK_H
 
 #include <map>
-
+#include <list>
+#include <vector>
+#include <pthread.h>
+#include <algorithm>
 #include "LockRW.h"
 #include "Account.h"
 #include "ATM.h"
