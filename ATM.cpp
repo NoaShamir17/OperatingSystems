@@ -553,6 +553,22 @@ bool ATM::processCommand(const std::string& line) {
             return true;
         }
 
+        // -------------------------------------------------------
+        // R: Rollback
+        // Format: R <iterations>
+        // -------------------------------------------------------
+        case 'R': {
+            int iterations;
+            ss >> iterations;
+            
+            // Execute Rollback via Bank
+            // Passes 'id' (ATM ID) for the log message
+            Bank::getInstance().rollback(id, iterations);
+
+            // Per instructions, the success message is logged inside the Bank::rollback function.
+            return true;
+        }
+
         default:
             return false;
     }

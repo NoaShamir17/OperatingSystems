@@ -3,7 +3,8 @@
 
 LogFile::LogFile() {
     pthread_mutex_init(&writeMutex, NULL);
-    logStream.open("log.txt", std::ofstream::out | std::ofstream::app); 
+    // Use 'trunc' to clear the file content when opening
+    logStream.open("log.txt", std::ofstream::out | std::ofstream::trunc); 
 }
 
 LogFile::~LogFile() {
