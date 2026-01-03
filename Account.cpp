@@ -1,16 +1,18 @@
 #include "Account.h"
-#include <cmath>     // For std::round
-#include <iostream>  // For error logging if needed
+#include "LogFile.h"   // For LogFile::getInstance().write
+#include <sstream>      // For std::stringstream
+#include <cmath>        // For std::round
+#include <iostream>     // For error logging if needed
 
 // --------------------------------------------------------------------------
 // Constructor
 // --------------------------------------------------------------------------
 Account::Account(int id, int password, int initILS, int initUSD)
-    : id(id),                       // Initialize integer id
+    : accountLock(),                // <--- Explicitly call LockRW constructor
+      id(id),                       // Initialize integer id
       password(password),           // Initialize integer password
       balanceILS(initILS),          // Initialize integer balanceILS
-      balanceUSD(initUSD),          // Initialize integer balanceUSD
-      accountLock()                 // <--- Explicitly call LockRW constructor
+      balanceUSD(initUSD)           // Initialize integer balanceUSD
 {
     // The body is empty because everything was done in the initializer list.
 }
@@ -19,11 +21,11 @@ Account::Account(int id, int password, int initILS, int initUSD)
 // Copy Constructor
 // --------------------------------------------------------------------------
 Account::Account(const Account& other) 
-    : id(other.id),                   // Copy the ID
+    : accountLock(),                  // <--- Explicitly create a NEW, fresh lock
+      id(other.id),                   // Copy the ID
       password(other.password),       // Copy the Password
       balanceILS(other.balanceILS),   // Copy the Balance
-      balanceUSD(other.balanceUSD),   // Copy the Balance
-      accountLock()                   // <--- Explicitly create a NEW, fresh lock
+      balanceUSD(other.balanceUSD)    // Copy the Balance
 {
     // Body is empty
 
@@ -125,16 +127,16 @@ void Account::takeCommission(double percentage) {
 // --------------------------------------------------------------------------
 void Account::lockAccount(bool writeMode) {
     if (writeMode == WRITER_MODE) {
-        accountLock.writeLock();
+        accountLock.writeEnter();
     } else {
-        accountLock.readLock();
+        accountLock.readEnter();
     }
 }
 
 void Account::unlockAccount(bool writeMode) {
     if (writeMode == WRITER_MODE) {
-        accountLock.writeUnlock();
+        accountLock.writeExit();
     } else {
-        accountLock.readUnlock();
+        accountLock.readExit();
     }
 }
