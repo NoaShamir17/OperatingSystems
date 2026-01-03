@@ -4,11 +4,16 @@
 #include <map>
 #include <list>
 #include <vector>
+#include <queue>
+#include <string>
+#include <cstdint>
 #include <pthread.h>
 #include <algorithm>
 #include "LockRW.h"
 #include "Account.h"
-#include "ATM.h"
+
+// Forward declaration (avoids include cycle with ATM.h)
+class ATM;
 
 #define DOLLAR_TO_ILS_RATE 5 // 1 USD = 5 ILS
 
@@ -35,6 +40,51 @@ private:
     // List of maps. Each map is a "status" of the bank at a point in time.
     std::list<std::map<int, AccountSnapshot> > history; 
     pthread_mutex_t historyMutex;
+
+    // --- ATM Close Requests (handled by status thread) ---
+    struct CloseATMRequest {
+        int requesterId;
+        int targetId;
+    };
+    std::queue<CloseATMRequest> closeATMQueue;
+    pthread_mutex_t closeATMMutex;
+
+    // --- Rollback Requests (handled by status thread) ---
+    struct RollbackRequest {
+        int requesterId;
+        int iterations;
+    };
+    std::queue<RollbackRequest> rollbackQueue;
+    pthread_mutex_t rollbackMutex;
+
+    // --- VIP Requests (producer-consumer, priority) ---
+    struct VIPRequest {
+        int priority;            // 1..100 (higher = earlier)
+        std::uint64_t sequence;  // FIFO tie-breaker
+        int requesterATM;        // original ATM id (for logging)
+        std::string commandLine; // command line without trailing VIP=X
+    };
+    struct VIPCompare {
+        bool operator()(const VIPRequest& a, const VIPRequest& b) const {
+            if (a.priority != b.priority) {
+                return a.priority < b.priority; // max-heap by priority
+            }
+            return a.sequence > b.sequence;     // earlier sequence first
+        }
+    };
+
+    std::priority_queue<VIPRequest, std::vector<VIPRequest>, VIPCompare> vipQueue;
+    pthread_mutex_t vipMutex;
+    pthread_cond_t vipCond;
+    std::vector<pthread_t> vipThreads;
+    int vipThreadCount;
+    std::uint64_t vipSequenceCounter;
+
+    // Helpers
+    void handleCloseATMRequests();
+    void handleRollbackRequests();
+    static void* vipRoutine(void* arg);
+    void executeCommandLine(int atmId, const std::string& line);
 
     // Internal helper to create a snapshot
     void takeSnapshot();
@@ -68,9 +118,15 @@ public:
     // uses ATM::close()
     void requestCloseATM(int requesterId, int targetId);
 
-    // Rollback Command
-    // Executed by ATM, locks the whole bank, restores state
+    // Rollback (internal executor): locks the whole bank, restores state
+    // Note: per assignment, rollback is executed by the status thread *after* printing status.
     void rollback(int atmId, int steps);
+
+    // Rollback request: enqueue for execution after next status print.
+    void requestRollback(int requesterId, int iterations);
+
+    // VIP: enqueue a VIP command line for processing by VIP consumer threads.
+    void addVIPRequest(int requesterATM, const std::string& fullLine);
 
     //----------------Thread Routines--------------------------
 
@@ -81,7 +137,7 @@ public:
     static void* statusRoutine(void* arg);
 
     //-----------------System control--------------------------
-    void run();
+    void run(int numberOfVIPThreads);
     void stop();
 };
 
