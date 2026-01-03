@@ -7,6 +7,7 @@
 #include <iostream>
 #include <unistd.h>  // For usleep
 #include <algorithm> // For std::min, std::max
+#include <cmath>     // For std::pow, std::round
 
 // --------------------------------------------------------------------------
 // Constructor & Destructor
@@ -61,6 +62,7 @@ void ATM::run() {
             // Hand off the entire command line to the Bank's VIP handler
             // (Assuming Bank has a method addVIPRequest(std::string))
             // Bank::getInstance().addVIPRequest(line); 
+            Bank::getInstance().addVIPRequest(id, line);
             continue; // Do not execute locally
         }
 
@@ -530,7 +532,7 @@ bool ATM::processCommand(const std::string& line) {
 
             // 2. Create the thread
             pthread_t investment_thread;
-            if (pthread_create(&investment_thread, NULL, investmentRoutine, (void*)args) != 0) {
+            if (pthread_create(&investment_thread, NULL, ATM::investmentRoutine, (void*)args) != 0) {
                 // If thread creation fails, we must refund the money!
                 if (currencyStr == "ILS") acc->balanceILS += amount;
                 else acc->balanceUSD += amount;
@@ -563,7 +565,8 @@ bool ATM::processCommand(const std::string& line) {
             
             // Execute Rollback via Bank
             // Passes 'id' (ATM ID) for the log message
-            Bank::getInstance().rollback(id, iterations);
+            // Note: The rollback is executed by the Bank's status thread *after* printing the next status.
+            Bank::getInstance().requestRollback(id, iterations);
 
             // Per instructions, the success message is logged inside the Bank::rollback function.
             return true;
@@ -590,16 +593,10 @@ void ATM::logError(const std::string& msg) {
 //--------------------------------------------------------------------------
 
 // Data structure to pass multiple arguments to the investment thread
-struct InvestmentData {
-    int atmId;
-    int accountId;
-    int amount;
-    std::string currency;
-    int timeMillis;
-};
+// Defined in ATM.h as ATM::InvestmentData
 
 // Helper function for the investment thread
-void* investmentRoutine(void* arg) {
+void* ATM::investmentRoutine(void* arg) {
     // 1. Unpack and Free Memory
     // We must copy the data to local variables and delete the struct immediately
     InvestmentData* data = (InvestmentData*)arg;
@@ -609,6 +606,8 @@ void* investmentRoutine(void* arg) {
     std::string currency = data->currency;
     int timeMillis = data->timeMillis;
     delete data; // CRITICAL: Free the heap memory we allocated in the main thread
+
+    (void)atmId; // reserved for potential logging/debug
 
     // 2. Sleep
     usleep(timeMillis * 1000); // usleep takes microseconds
