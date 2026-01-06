@@ -990,7 +990,7 @@ void* Bank::statusRoutine(void* arg) {
 
         bank->takeSnapshot();//!rollbackPending);
         bank->handleCloseATMRequests();
-        bank->handleRollbackRequests();
+        //bank->handleRollbackRequests();
 
         // Print first, then sleep. This guarantees that we have an initial
         // snapshot early in the run (helps rollback correctness and tests).
