@@ -1,15 +1,13 @@
 #include "Account.h"
 #include "LogFile.h"   // For LogFile::getInstance().write
-
-#include <cmath>        // For std::round
 #include <sstream>      // For std::stringstream
+#include <cmath>        // For std::round
+#include <iostream>     // For error logging if needed
 
 // --------------------------------------------------------------------------
 // Constructor
 // --------------------------------------------------------------------------
 Account::Account(int id, int password, int initILS, int initUSD)
-    // IMPORTANT: Member initialization order follows the declaration order in Account.h.
-    // This avoids -Wreorder (treated as error with -Werror).
     : accountLock(),                // <--- Explicitly call LockRW constructor
       id(id),                       // Initialize integer id
       password(password),           // Initialize integer password
@@ -23,7 +21,6 @@ Account::Account(int id, int password, int initILS, int initUSD)
 // Copy Constructor
 // --------------------------------------------------------------------------
 Account::Account(const Account& other) 
-    // IMPORTANT: Member initialization order follows the declaration order in Account.h.
     : accountLock(),                  // <--- Explicitly create a NEW, fresh lock
       id(other.id),                   // Copy the ID
       password(other.password),       // Copy the Password
