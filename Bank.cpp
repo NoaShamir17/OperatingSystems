@@ -651,54 +651,55 @@ void Bank::executeCommandLine(int atmId, const std::string& line) {
 
         case 'T': {
             ss >> accountId >> password >> targetId >> amount >> currencyStr;
-            bool isILS = (currencyStr == "ILS");
+            const bool isILS = (currencyStr == "ILS");
 
-            Bank::getInstance().lockBank(READER_MODE);
-
-            Account* src = Bank::getInstance().getAccount(accountId);
-            Account* dst = Bank::getInstance().getAccount(targetId);
+            lockBank(READER_MODE);
+            Account* src = getAccount(accountId);
+            Account* dst = getAccount(targetId);
 
             if (!src) {
-                logError("Error " + std::to_string(id) + ": Your transaction failed - account id " + std::to_string(accountId) + " does not exist");
-                Bank::getInstance().unlockBank(READER_MODE);
-                return false;
+                std::stringstream msg;
+                msg << "Error " << atmId << ": Your transaction failed - account id " << accountId << " does not exist";
+                LogFile::getInstance().write(msg.str());
+                unlockBank(READER_MODE);
+                return;
             }
             if (!dst) {
-                logError("Error " + std::to_string(id) + ": Your transaction failed - account id " + std::to_string(targetId) + " does not exist");
-                Bank::getInstance().unlockBank(READER_MODE);
-                return false;
+                std::stringstream msg;
+                msg << "Error " << atmId << ": Your transaction failed - account id " << targetId << " does not exist";
+                LogFile::getInstance().write(msg.str());
+                unlockBank(READER_MODE);
+                return;
             }
 
-            // DEADLOCK PREVENTION: Always lock smaller ID first
             Account* first = (src->id < dst->id) ? src : dst;
             Account* second = (src->id < dst->id) ? dst : src;
-
             first->lockAccount(WRITER_MODE);
             second->lockAccount(WRITER_MODE);
 
             if (!src->checkPassword(password)) {
-                logError("Error " + std::to_string(id) + ": Your transaction failed - password for account id " + std::to_string(accountId) + " is incorrect");
+                std::stringstream msg;
+                msg << "Error " << atmId << ": Your transaction failed - password for account id " << accountId << " is incorrect";
+                LogFile::getInstance().write(msg.str());
                 second->unlockAccount(WRITER_MODE);
                 first->unlockAccount(WRITER_MODE);
-                Bank::getInstance().unlockBank(READER_MODE);
-                return false;
+                unlockBank(READER_MODE);
+                return;
             }
 
-
-            //Error <ATM ID>: Your transaction failed – balance of account id <id> is lower than <amount> <currency>
-            int currentBalance = isILS ? src->balanceILS : src->balanceUSD;
+            const int currentBalance = isILS ? src->balanceILS : src->balanceUSD;
             if (currentBalance < amount) {
-                 std::stringstream msg;
-                 msg << "Error " << id << ": Your transaction failed - balance of account id " << accountId 
+                std::stringstream msg;
+                msg << "Error " << atmId << ": Your transaction failed - balance of account id " << accountId 
                      << " is lower than " << amount << " " << currencyStr;
-                 logError(msg.str());
-                 second->unlockAccount(WRITER_MODE);
-                 first->unlockAccount(WRITER_MODE);
-                 Bank::getInstance().unlockBank(READER_MODE);
-                 return false;
+
+                LogFile::getInstance().write(msg.str());
+                second->unlockAccount(WRITER_MODE);
+                first->unlockAccount(WRITER_MODE);
+                unlockBank(READER_MODE);
+                return;
             }
 
-            // Execute Transfer
             if (isILS) {
                 src->balanceILS -= amount;
                 dst->balanceILS += amount;
@@ -706,20 +707,22 @@ void Bank::executeCommandLine(int atmId, const std::string& line) {
                 src->balanceUSD -= amount;
                 dst->balanceUSD += amount;
             }
+            
 
-
+            // <ATM ID>: Transfer <amount> <currency> from account <source account> to account <target account>
+            // new account balance is <source balance ILS> ILS and < source balance USD> USD new target account
+            // balance is <target balance ILS> ILS and <target balance USD> USD
             std::stringstream msg;
-            msg << id << ": Transfer " << amount << " " << currencyStr 
-                << " from account " << accountId << " to account " << targetId 
-                << " new account balance is " << src->balanceILS << " ILS and " << src->balanceUSD << " USD"
-                << " new target account balance is " << dst->balanceILS << " ILS and " << dst->balanceUSD << " USD";
-            logSuccess(msg.str());
+            msg << atmId << ": Transfer " << amount << " " << currencyStr
+                << " from account " << accountId << " to account " << targetId
+                << " new account balance is " << src->balanceILS << " ILS and " << src->balanceUSD
+                << " USD new target account balance is " << dst->balanceILS << " ILS and " << dst->balanceUSD << " USD";
+            LogFile::getInstance().write(msg.str());
 
             second->unlockAccount(WRITER_MODE);
             first->unlockAccount(WRITER_MODE);
-            Bank::getInstance().unlockBank(READER_MODE);
-
-            return true;
+            unlockBank(READER_MODE);
+            return;
         }
 
         case 'Q': {

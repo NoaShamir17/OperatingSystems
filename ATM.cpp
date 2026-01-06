@@ -275,6 +275,7 @@ bool ATM::processCommand(const std::string& line) {
             second->lockAccount(WRITER_MODE);
 
             if (!src->checkPassword(password)) {
+                //Error <ATM ID>: Your transaction failed – password for account id <id> is incorrect
                 logError("Error " + std::to_string(id) + ": Your transaction failed - password for account id " + std::to_string(accountId) + " is incorrect");
                 second->unlockAccount(WRITER_MODE);
                 first->unlockAccount(WRITER_MODE);
@@ -305,7 +306,9 @@ bool ATM::processCommand(const std::string& line) {
                 dst->balanceUSD += amount;
             }
 
-
+            //<ATM ID>: Transfer <amount> <currency> from account <source account> to account <target account>
+            //new account balance is <source balance ILS> ILS and < source balance USD> USD new target account
+            //balance is <target balance ILS> ILS and <target balance USD> USD
             std::stringstream msg;
             msg << id << ": Transfer " << amount << " " << currencyStr 
                 << " from account " << accountId << " to account " << targetId 
