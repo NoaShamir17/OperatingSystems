@@ -45,6 +45,11 @@ int main(int argc, char* argv[]) {
     atms.reserve(static_cast<size_t>(argc - 2));
 
     Bank& bank = Bank::getInstance();
+    //get all the singletons to initialize before starting threads
+    (void)LogFile::getInstance();
+    (void)Bank::getInstance();
+    
+
 
     // Register ATMs in the bank (used for the 'C' command)
     // We do this before starting any threads.
