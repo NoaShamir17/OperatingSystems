@@ -31,7 +31,7 @@ void ATM::close() {
     pthread_mutex_unlock(&activeMutex);
 }
 
-bool ATM::isActive() const {
+bool ATM::isActive(){
     pthread_mutex_lock(&activeMutex);
     bool status = active;
     pthread_mutex_unlock(&activeMutex);
