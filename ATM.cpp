@@ -570,7 +570,7 @@ bool ATM::processCommand(const std::string& line) {
             // Execute Rollback via Bank
             // Passes 'id' (ATM ID) for the log message
             // Note: The rollback is executed by the Bank's status thread *after* printing the next status.
-            Bank::getInstance().requestRollback(id, iterations);
+            Bank::getInstance().rollback(id, iterations);
 
             // Per instructions, the success message is logged inside the Bank::rollback function.
             return true;

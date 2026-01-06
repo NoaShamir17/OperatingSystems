@@ -50,13 +50,13 @@ private:
     std::queue<CloseATMRequest> closeATMQueue;
     pthread_mutex_t closeATMMutex;
 
-    // --- Rollback Requests (handled by status thread) ---
-    struct RollbackRequest {
-        int requesterId;
-        int iterations;
-    };
-    std::queue<RollbackRequest> rollbackQueue;
-    pthread_mutex_t rollbackMutex;
+    // // --- Rollback Requests (handled by status thread) ---
+    // struct RollbackRequest {
+    //     int requesterId;
+    //     int iterations;
+    // };
+    // std::queue<RollbackRequest> rollbackQueue;
+    // pthread_mutex_t rollbackMutex;
 
     // --- VIP Requests (producer-consumer, priority) ---
     struct VIPRequest {

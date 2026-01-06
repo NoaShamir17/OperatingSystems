@@ -85,7 +85,7 @@ Bank::Bank()
       commissionThread(),
       statusThread(),
       closeATMQueue(),
-      rollbackQueue(),
+      //rollbackQueue(),
       vipQueue(),
       vipThreads(),
       vipThreadCount(0),
@@ -192,15 +192,15 @@ void Bank::requestCloseATM(int requesterId, int targetId) {
     pthread_mutex_unlock(&closeATMMutex);
 }
 
-void Bank::requestRollback(int requesterId, int iterations) {
-    RollbackRequest req;
-    req.requesterId = requesterId;
-    req.iterations = iterations;
+// void Bank::requestRollback(int requesterId, int iterations) {
+//     RollbackRequest req;
+//     req.requesterId = requesterId;
+//     req.iterations = iterations;
 
-    pthread_mutex_lock(&rollbackMutex);
-    rollbackQueue.push(req);
-    pthread_mutex_unlock(&rollbackMutex);
-}
+//     pthread_mutex_lock(&rollbackMutex);
+//     rollbackQueue.push(req);
+//     pthread_mutex_unlock(&rollbackMutex);
+// }
 
 void Bank::addVIPRequest(int requesterATM, const std::string& fullLine) {
     // Parse trailing "VIP=X" token (appears as the last word with one space).
@@ -286,7 +286,7 @@ void Bank::stop() {
 // Snapshot (atomic view)
 // ---------------------------
 
-void Bank::takeSnapshot(bool saveToHistory) {
+void Bank::takeSnapshot(){//bool saveToHistory) {
     // 1) Lock bank for reading (stabilize map iteration)
     lockBank(READER_MODE);
 
@@ -322,14 +322,21 @@ void Bank::takeSnapshot(bool saveToHistory) {
     fflush(stdout);
 
     // 4) Push to history (max 100) - optionally
-    if (saveToHistory) {
-        pthread_mutex_lock(&historyMutex);
-        history.push_back(currentSnapshot);
-        while (history.size() > 100u) {
-            history.pop_front();
-        }
-        pthread_mutex_unlock(&historyMutex);
+    // if (saveToHistory) {
+    //     pthread_mutex_lock(&historyMutex);
+    //     history.push_back(currentSnapshot);
+    //     while (history.size() > 100u) {
+    //         history.pop_front();
+    //     }
+    //     pthread_mutex_unlock(&historyMutex);
+    // }
+
+    pthread_mutex_lock(&historyMutex);
+    history.push_back(currentSnapshot);
+    while (history.size() > 100u) {
+        history.pop_front();
     }
+    pthread_mutex_unlock(&historyMutex);
 
     // 5) Unlock ALL accounts (reverse order)
     for (std::map<int, Account*>::reverse_iterator rit = accounts.rbegin(); rit != accounts.rend(); ++rit) {
@@ -445,20 +452,20 @@ void Bank::handleCloseATMRequests() {
     }
 }
 
-void Bank::handleRollbackRequests() {
-    std::vector<RollbackRequest> reqs;
+// void Bank::handleRollbackRequests() {
+//     std::vector<RollbackRequest> reqs;
 
-    pthread_mutex_lock(&rollbackMutex);
-    while (!rollbackQueue.empty()) {
-        reqs.push_back(rollbackQueue.front());
-        rollbackQueue.pop();
-    }
-    pthread_mutex_unlock(&rollbackMutex);
+//     pthread_mutex_lock(&rollbackMutex);
+//     while (!rollbackQueue.empty()) {
+//         reqs.push_back(rollbackQueue.front());
+//         rollbackQueue.pop();
+//     }
+//     pthread_mutex_unlock(&rollbackMutex);
 
-    for (size_t i = 0; i < reqs.size(); ++i) {
-        rollback(reqs[i].requesterId, reqs[i].iterations);
-    }
-}
+//     for (size_t i = 0; i < reqs.size(); ++i) {
+//         rollback(reqs[i].requesterId, reqs[i].iterations);
+//     }
+// }
 
 
 // ---------------------------
@@ -922,7 +929,7 @@ void Bank::executeCommandLine(int atmId, const std::string& line) {
         case 'R': {
             int iterations;
             ss >> iterations;
-            requestRollback(atmId, iterations);
+            rollback(atmId, iterations);
             return;
         }
 
@@ -976,12 +983,12 @@ void* Bank::statusRoutine(void* arg) {
         // If a rollback is pending, we still print the status but we do NOT
         // push a new snapshot before performing the rollback. This keeps the
         // meaning of "R k" as rolling back k previously completed bank iterations.
-        bool rollbackPending = false;
-        pthread_mutex_lock(&bank->rollbackMutex);
-        rollbackPending = !bank->rollbackQueue.empty();
-        pthread_mutex_unlock(&bank->rollbackMutex);
+        // bool rollbackPending = false;
+        // pthread_mutex_lock(&bank->rollbackMutex);
+        // rollbackPending = !bank->rollbackQueue.empty();
+        // pthread_mutex_unlock(&bank->rollbackMutex);
 
-        bank->takeSnapshot(!rollbackPending);
+        bank->takeSnapshot();//!rollbackPending);
         bank->handleCloseATMRequests();
         bank->handleRollbackRequests();
 
