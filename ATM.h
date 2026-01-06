@@ -13,6 +13,7 @@ private:
     int id;
     std::string inputFilePath;
     bool active;       // The flag to control ATM lifecycle
+    pthread_mutex_t activeMutex; // Mutex to protect 'active' flag
     pthread_t thread;  // The thread running this ATM
 
     // Helper to parse and execute a single line
@@ -48,7 +49,7 @@ public:
     void close(); 
     
     // Check if ATM is still running (useful for Bank cleanup)
-    bool isActive() const;
+    bool isActive();
 
     // Getters
     int getId() const { return id; }

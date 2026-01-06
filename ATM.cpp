@@ -14,21 +14,28 @@
 // --------------------------------------------------------------------------
 ATM::ATM(int id, const std::string& filePath) 
     : id(id), inputFilePath(filePath), active(true) {
+    pthread_mutex_init(&activeMutex, NULL);
 }
 
 ATM::~ATM() {
     // Thread joining is typically handled by the Bank or Main function
+    pthread_mutex_destroy(&activeMutex);
 }
 
 // --------------------------------------------------------------------------
 // Lifecycle Management
 // --------------------------------------------------------------------------
 void ATM::close() {
-    active = false; // The run loop will see this and exit
+    pthread_mutex_lock(&activeMutex);
+    active = false; 
+    pthread_mutex_unlock(&activeMutex);
 }
 
 bool ATM::isActive() const {
-    return active;
+    pthread_mutex_lock(&activeMutex);
+    bool status = active;
+    pthread_mutex_unlock(&activeMutex);
+    return status;
 }
 
 void* ATM::startRoutine(void* arg) {
@@ -48,10 +55,10 @@ void ATM::run() {
     }
 
     std::string line;
-    while (active && std::getline(file, line)) {
+    while (isActive() && std::getline(file, line)) {
         
         // 1. Check if we were closed while reading
-        if (!active) break;
+        if (!isActive()) break;
         if (line.empty()) continue;
 
         // 2. Check for VIP Command
@@ -72,7 +79,9 @@ void ATM::run() {
     }
     
     file.close();
-    active = false; // Mark as finished
+    pthread_mutex_lock(&activeMutex);
+    active = false; 
+    pthread_mutex_unlock(&activeMutex);
 }
 
 // --------------------------------------------------------------------------
