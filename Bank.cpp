@@ -945,11 +945,11 @@ void* Bank::commissionRoutine(void* arg) {
         if (!bank->isWorking.load()) {
             break;
         }
+        const int pct = (rand_r(&seed) % 5) + 1; // 1..5
 
         bank->lockBank(READER_MODE);
         for (std::map<int, Account*>::iterator it = bank->accounts.begin(); it != bank->accounts.end(); ++it) {
             Account* acc = it->second;
-            const int pct = (rand_r(&seed) % 5) + 1; // 1..5
 
             acc->lockAccount(WRITER_MODE);
             const int commissionILS = (acc->balanceILS * pct) / 100;
