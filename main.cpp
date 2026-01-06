@@ -1,5 +1,6 @@
 #include "Bank.h"
 #include "ATM.h"
+#include "LogFile.h"
 
 #include <pthread.h>
 #include <vector>
@@ -48,7 +49,7 @@ int main(int argc, char* argv[]) {
     //get all the singletons to initialize before starting threads
     (void)LogFile::getInstance();
     (void)Bank::getInstance();
-    
+
 
 
     // Register ATMs in the bank (used for the 'C' command)
