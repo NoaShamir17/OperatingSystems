@@ -162,15 +162,7 @@ bool Bank::closeAccount(int id, int pass) {
     if (it == accounts.end()) {
         return false;
     }
-    Account* acc = it->second;
-
-    // Validate password under account lock
-    acc->lockAccount(READER_MODE);
-    const bool ok = acc->checkPassword(pass);
-    acc->unlockAccount(READER_MODE);
-    if (!ok) {
-        return false;
-    }
+    Account* acc = it->second;    
 
     delete acc;
     accounts.erase(it);
