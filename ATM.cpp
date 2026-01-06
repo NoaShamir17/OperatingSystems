@@ -282,12 +282,13 @@ bool ATM::processCommand(const std::string& line) {
                 return false;
             }
 
+
+            //Error <ATM ID>: Your transaction failed – balance of account id <id> is lower than <amount> <currency>
             int currentBalance = isILS ? src->balanceILS : src->balanceUSD;
             if (currentBalance < amount) {
                  std::stringstream msg;
-                 msg << "Error " << id << ": Your transaction failed - account id " << accountId 
-                     << " balance is " << src->balanceILS << " ILS and " << src->balanceUSD 
-                     << " USD is lower than " << amount << " " << currencyStr;
+                 msg << "Error " << id << ": Your transaction failed - balance of account id " << accountId 
+                     << " is lower than " << amount << " " << currencyStr;
                  logError(msg.str());
                  second->unlockAccount(WRITER_MODE);
                  first->unlockAccount(WRITER_MODE);
