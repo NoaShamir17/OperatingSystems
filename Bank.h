@@ -90,7 +90,7 @@ private:
     // Internal helper to print status and optionally store a snapshot in history.
     // When a rollback is pending, we print but avoid pushing a new snapshot so that
     // "R k" rolls back relative to the last completed iteration.
-    void takeSnapshot(bool saveToHistory = true);
+    void takeSnapshot();//bool saveToHistory = true);
 
     // Singleton instance
     Bank(); 
@@ -126,7 +126,7 @@ public:
     void rollback(int atmId, int steps);
 
     // Rollback request: enqueue for execution after next status print.
-    void requestRollback(int requesterId, int iterations);
+    //void requestRollback(int requesterId, int iterations);
 
     // VIP: enqueue a VIP command line for processing by VIP consumer threads.
     void addVIPRequest(int requesterATM, const std::string& fullLine);
