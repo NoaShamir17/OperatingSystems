@@ -93,7 +93,7 @@ Bank::Bank()
 
     pthread_mutex_init(&historyMutex, NULL);
     pthread_mutex_init(&closeATMMutex, NULL);
-    pthread_mutex_init(&rollbackMutex, NULL);
+    //pthread_mutex_init(&rollbackMutex, NULL);
     pthread_mutex_init(&vipMutex, NULL);
     pthread_cond_init(&vipCond, NULL);
 }
@@ -111,7 +111,7 @@ Bank::~Bank() {
 
     pthread_cond_destroy(&vipCond);
     pthread_mutex_destroy(&vipMutex);
-    pthread_mutex_destroy(&rollbackMutex);
+    //pthread_mutex_destroy(&rollbackMutex);
     pthread_mutex_destroy(&closeATMMutex);
     pthread_mutex_destroy(&historyMutex);
 }
