@@ -35,13 +35,24 @@ void heapKill();
 /*=============================================================================
 * Block
 =============================================================================*/
-//suggestion for block usage - feel free to change this
-typedef struct Block
+//Header point to the metadata for each allocated block
+// It is stored at the beginning of each block
+typedef struct Header
 {
     size_t size;
-    struct Block* next;
-    bool free;
-} Block;
-extern Block* blockList;
+    struct Header* prev;
+    struct Header* next;
+} Header;
+
+//list of ALLOCATED blocks
+//list is sorted by address (header address)
+
+//helper functions for linked list management
+void addHeaderToList(Header* newHeader, Header* predecessorHeader);
+void removeHeaderFromList(Header* header);
+bool findBestFit(size_t neededSize, Header** predecessortoBestFit);
+void* endOfBlock(Header* header);
+
+
 
 #endif // CUSTOM_ALLOCATOR
