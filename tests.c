@@ -16,6 +16,7 @@ void test1(){
 
 void test2(){
 	printf("-------------Test 2----------:\n");
+	printf("sizeof header: %zu\n", sizeof(Header));
 	char* ptr1 = (char*)customMalloc(20);
 	char* ptr2 = (char*)customMalloc(30);
 	char* ptr3 = (char*)customMalloc(40);
