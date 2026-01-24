@@ -7,7 +7,7 @@ static Header* headerListTail = NULL; // Your sorted list tail
 
 // for multi-threaded allocator
 static pthread_mutex_t counterMutex = PTHREAD_MUTEX_INITIALIZER;
-static int counter = 0;
+//static int counter = 0;
 
 //------------------------------------------------//
 
@@ -103,7 +103,7 @@ bool findBestFit(size_t neededSize, Header** predecessortoBestFit){
         return false;
     }
 
-};
+}
 
 size_t followingFreeBlockSize(Header* header){
     if(header == NULL ){
@@ -265,6 +265,4 @@ PART A JOVER
 PART B
 =============================================================================*/
 
-void* customMTMalloc(size_t size){
 
-}

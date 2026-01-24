@@ -1,5 +1,6 @@
 #ifndef __CUSTOM_ALLOCATOR__
 #define __CUSTOM_ALLOCATOR__
+#define _DEFAULT_SOURCE  // Tells the compiler to include BSD/SVID functions like sbrk
 #include <unistd.h> //for sbrk
 #include <stdbool.h> //for bool type
 #include <string.h> //for memset, memcpy
@@ -42,7 +43,6 @@ void heapKill();
 #define ALIGN_TO_MULT_OF_4(x) (((((x) - 1) >> 2) << 2) + 4)
 #define REGION_SIZE ((1 << 12) + sizeof(Header) + sizeof(pthread_mutex_t)) //4KB + header size + mutex size
 #define INITIAL_REGION_NUM 8 //minimum number of regions to allocate at heap creation
-#define _DEFAULT_SOURCE  // Tells the compiler to include BSD/SVID functions like sbrk
 /*=============================================================================
 * Block
 =============================================================================*/
