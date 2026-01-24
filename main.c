@@ -4,11 +4,8 @@
 int main() {
 	printf("hello\n");
     heapCreate();
-    //test1();
-    test2();
-    //test3();
-    //testCalloc();
-    //testRealloc();
+    testGapAtStart();
+    testBestFit();
     heapKill();
     return 0;
 }

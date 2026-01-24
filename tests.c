@@ -1,20 +1,22 @@
 #include "tests.h"
 
 
-void test1(){
+void testFreeErr(){
 	printf("-------------Test 1----------:\n");
 	char* ptr = (char*)customMalloc(100);
+	char* ptr2 = ptr;
 	printf("pointer is %p\n", ptr);
 	ptr = "Noa";
 	printf("pointer is %p\n", ptr);
 	printf("%s\n", ptr);
 	customFree(ptr);
+	customFree(ptr2);
 	printf("%s\n", ptr);
 	printf("End of Test 1\n");
 }
 
 
-void test2(){
+void testBasic1(){
 	printf("-------------Test 2----------:\n");
 	printf("sizeof header: %zu\n", sizeof(Header));
 	char* ptr1 = (char*)customMalloc(20);
@@ -34,7 +36,7 @@ void test2(){
 
 }
 
-void test3(){
+void testBasic2(){
 	printf("-------------Test 3----------:\n");
 	char* y = (char*)customMalloc(10);
 	*y ='y';
@@ -59,6 +61,60 @@ void test3(){
 	customFree(r);
 	customFree(o);
 	printf("End of Test 3\n");
+}
+
+void testGapAtStart(){
+	printf("-------------Test 4----------:\n");
+	char* ptrs[10];
+	for(int i = 0; i < 10; i++){
+		ptrs[i] = (char*)customMalloc(i * 10);
+		printf("Allocated ptrs[%d] at %p\n", i, ptrs[i]);
+	}
+	customFree(ptrs[0]);
+	customFree(ptrs[1]);
+	customFree(ptrs[4]);
+	customFree(ptrs[7]);
+	customFree(ptrs[8]);
+
+	void* p1 = customMalloc(15);
+	void* p2 = customMalloc(10);
+	void* p3 = customMalloc(100);
+
+	customFree(p1);
+	customFree(p2);
+	customFree(p3);
+	customFree(ptrs[2]);
+	customFree(ptrs[3]);
+	customFree(ptrs[5]);
+	customFree(ptrs[6]);
+	customFree(ptrs[9]);
+	printf("End of Test 4\n");
+}
+
+void testBestFit(){
+	printf("-------------Test Best Fit----------:\n");
+	char* ptrs[20];
+	for(int i = 0; i < 20; i++){
+		ptrs[i] = (char*)customMalloc(200 - i * 10);
+		printf("Allocated ptrs[%d] at %p\n", i, ptrs[i]);
+	}
+	for(int i = 0; i < 20; i += 2){
+		customFree(ptrs[i]);
+	}
+
+	void* p1 = customMalloc(50); //should fit into ptrs[2]
+	void* p2 = customMalloc(80); //should fit into ptrs[10]
+	void* p3 = customMalloc(30); //should fit into ptrs[0]
+
+	customFree(p1);
+	customFree(p2);
+	customFree(p3);
+	for(int i = 1; i < 20; i += 2){
+		if(ptrs[i] != NULL){
+			customFree(ptrs[i]);
+		}
+	}	
+	printf("End of Test Best Fit\n");
 }
 
 void testCalloc(){

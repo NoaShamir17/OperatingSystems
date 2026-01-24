@@ -3,9 +3,11 @@
 #include "customAllocator.h"
 
 
-void test1();
-void test2();
-void test3();
+void testFreeErr();
+void testBasic1();
+void testBasic2();
+void testGapAtStart();
+void testBestFit();
 void testCalloc();
 void testRealloc();
 
