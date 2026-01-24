@@ -150,6 +150,7 @@ void* customMalloc(size_t size){
     printf("found best fit: %s\n", found_free_block ? "true" : "false");
     if(!found_free_block){
         //no free block, raise program break
+        predecessorHeader = headerListTail;
         startHeader = sbrk(neededSize); 
         if(startHeader == SBRK_FAIL){
             if(errno == ENOMEM){
