@@ -135,6 +135,7 @@ PART A
 =============================================================================*/
 
 void* customMalloc(size_t size){
+    printMemState();
     if(size == 0){
         return NULL;
     }
@@ -176,6 +177,7 @@ void* customMalloc(size_t size){
 }
 
 void customFree(void* ptr){
+    printMemState();
     if(ptr == NULL){
         return;
     }
@@ -215,6 +217,7 @@ void* customCalloc(size_t nmemb, size_t size){
 }
 
 void* customRealloc(void* ptr, size_t size){
+    printMemState();
     if(ptr == NULL){
         return customMalloc(size);
     }
@@ -266,3 +269,20 @@ PART B
 =============================================================================*/
 
 
+/*=============================================================================
+DEBUG FUNCTIONS
+=============================================================================*/
+
+void printMemState(){
+    printf("-------- Memory State --------\n");
+    printf("Heap Start: %p\n", heapStart);
+    printf("Program Break: %p\n", sbrk(0));
+    Header* current = headerList;
+    int index = 0;
+    while(current != NULL){
+        printf("Block %d: Header at %p, Size: %zu, End: %p\n", index, current, current->size, endOfBlock(current));
+        index++;
+        current = current->next;
+    }
+    printf("-------- End of Memory State --------\n");
+}

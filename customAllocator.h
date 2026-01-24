@@ -65,6 +65,7 @@ bool findBestFit(size_t neededSize, Header** predecessortoBestFit);
 void* endOfBlock(Header* header);
 size_t followingFreeBlockSize(Header* header);
 void outOfMemHandler();
+void printMemState();
 
 
 #endif // CUSTOM_ALLOCATOR
