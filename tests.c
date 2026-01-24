@@ -46,7 +46,7 @@ void test3(){
 	customFree(a);
 	char* o = (char*)customMalloc(5);
 	*o ='o';
-	printf("%c%c%c%c%c\n", *y, *o, *i, *r);
+	printf("%c%c%c%c\n", *y, *o, *i, *r);
 	//print addresses
 	printf("Addresses: y: %p, o: %p, i: %p, r: %p\n", y, o, i, r);
 
