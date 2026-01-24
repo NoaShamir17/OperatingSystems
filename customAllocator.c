@@ -279,7 +279,7 @@ DEBUG FUNCTIONS
 =============================================================================*/
 
 void printMemState(){
-    printf("-------- Memory State --------\n");
+    printf("\n\n\n-------- Memory State --------\n");
     printf("Heap Start: %p\n", heapStart);
     printf("Program Break: %p\n", sbrk(0));
     //Header* current = headerList;
@@ -289,5 +289,5 @@ void printMemState(){
     //     index++;
     //     current = current->next;
     // }
-    printf("-------- End of Memory State --------\n");
+    printf("-------- End of Memory State --------\n\n\n\n");
 }
