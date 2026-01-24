@@ -24,8 +24,11 @@ void test2(){
 	char* ptr4 = (char*)customMalloc(25);
 	printf("ptr4: %p\n", ptr4);
 	customFree(ptr1);
+	printf("Freed ptr1\n");
 	customFree(ptr3);
+	printf("Freed ptr3\n");
 	customFree(ptr4);
+	printf("Freed ptr4\n");
 	printf("End of Test 2\n");
 
 }
