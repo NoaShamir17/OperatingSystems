@@ -134,6 +134,7 @@ void outOfMemHandler(){
 PART A
 =============================================================================*/
 
+
 void* customMalloc(size_t size){
     if(size == 0){
         return NULL;
@@ -145,7 +146,7 @@ void* customMalloc(size_t size){
     bool found_free_block = findBestFit(neededSize, &predecessorHeader);
     if(!found_free_block){
         //no free block, raise program break
-        startHeader = sbrk(neededSize);
+        startHeader = sbrk(neededSize); 
         if(startHeader == SBRK_FAIL){
             if(errno == ENOMEM){
                 outOfMemHandler();
@@ -178,10 +179,12 @@ void* customMalloc(size_t size){
 
 void customFree(void* ptr){
     if(ptr == NULL){
+        printMemState();
         return;
     }
     if((size_t)ptr < (size_t)heapStart || (size_t)ptr >= (size_t)sbrk(0)){
         printf("<free error>: passed non-heap pointer\n");
+        printMemState();
         return;
     }
     Header* headerToFree = (Header*)((size_t)ptr - sizeof(Header));
@@ -199,6 +202,7 @@ void customFree(void* ptr){
             } else {
                 printf("<brk error>: bad brk args\n");
             }
+            printMemState();
             return;
         }
     }
