@@ -1,8 +1,5 @@
 #include "customAllocator.h"
-#include <unistd.h> //for sbrk
-#include <stdbool.h> //for bool type
-#include <string.h> //for memset, memcpy
-#include <pthread.h> //for mutex
+
 
 static void* heapStart = NULL;
 static Header* headerList = NULL; // Your sorted list head
@@ -97,6 +94,12 @@ void* endOfBlock(Header* header){
     return (void*)((size_t)header + sizeof(Header) + header->size);
 }
 
+void outOfMemHandler(){
+    brk(heapStart); //reset brk to initial state
+    printf("<sbrk/brk error>: out of memory\n");
+    exit(1);
+}
+
 
 
 
@@ -115,9 +118,14 @@ void* customMalloc(size_t size){
     bool found_free_block = findBestFit(neededSize, &predecessorHeader);
     if(!found_free_block){
         //no free block, raise program break
-        startHeader = sbrk(neededSize); //TODO: check errno
+        startHeader = sbrk(neededSize);
         if(startHeader == SBRK_FAIL){
-            return NULL;
+            if(errno == ENOMEM){
+                outOfMemHandler();
+            } else {
+                printf("<sbrk error>: bad sbrk args\n");
+                return NULL;
+            }
         }
     }
     else {
@@ -145,14 +153,20 @@ void customFree(void* ptr){
         return;
     }
     if((size_t)ptr < (size_t)heapStart || (size_t)ptr >= (size_t)sbrk(0)){
+        printf("<free error>: passed non-heap pointer\n");
         return;
     }
     Header* headerToFree = (Header*)((size_t)ptr - sizeof(Header));
     removeHeaderFromList(headerToFree);
-    if(endOfBlock(headerToFree) == sbrk(0)){ // TODO: check if its sbrk(0) - 1 or + 1
-        int err = brk(headerToFree); //TODO: check if its brk() - 1 or + 1
-        if(err != 0){//TODO check errno
-            printf("brk failed in customFree\n");
+    if(endOfBlock(headerToFree) == sbrk(0)){
+        int err = brk(headerToFree); 
+        if(err == BRK_FAIL){
+            if(errno == ENOMEM){
+                outOfMemHandler();
+            } else {
+                printf("<brk error>: bad brk args\n");
+            }
+            return;
         }
     }
 }
@@ -167,5 +181,55 @@ void* customCalloc(size_t nmemb, size_t size){
     memset(allocatedPtr, 0, totalSize);
     return allocatedPtr;
 }
+
+void* customRealloc(void* ptr, size_t size){
+    if(ptr == NULL){
+        return customMalloc(size);
+    }
+    if((size_t)ptr < (size_t)heapStart || (size_t)ptr >= (size_t)sbrk(0)){
+        printf("<realloc error>: passed non-heap pointer\n");
+        return NULL;
+    }
+    if(size == 0){
+        customFree(ptr);
+        return NULL;
+    }
+    Header* currentHeader = (Header*)((size_t)ptr - sizeof(Header));
+    if(currentHeader->size >= size){
+        if(endOfBlock(currentHeader) == sbrk(0)){
+            currentHeader->size = size;
+            int err = brk(endOfBlock(currentHeader));
+            if(err == BRK_FAIL){
+                if(errno == ENOMEM){
+                    outOfMemHandler();
+                } else {
+                    printf("<brk error>: bad brk args\n");
+                    return NULL;
+                }
+            }
+        } else {
+            currentHeader->size = size;
+        }
+        return ptr;
+    } else {
+        void* newPtr = customMalloc(size);
+        if(newPtr == NULL){
+            return NULL;
+        }
+        //copy old data to new block
+        memcpy(newPtr, ptr, currentHeader->size);
+        customFree(ptr);
+        return newPtr;
+    }
+    
+}
+
+/*=============================================================================
+PART A JOVER
+=============================================================================*/
+
+/*=============================================================================
+PART B
+=============================================================================*/
 
 

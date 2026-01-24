@@ -1,5 +1,11 @@
 #ifndef __CUSTOM_ALLOCATOR__
 #define __CUSTOM_ALLOCATOR__
+#include <unistd.h> //for sbrk
+#include <stdbool.h> //for bool type
+#include <string.h> //for memset, memcpy
+#include <pthread.h> //for mutex
+#include <stdio.h> //for printf
+#include <errno.h> //for errno
 
 /*=============================================================================
 * do no edit lines below!
@@ -30,6 +36,7 @@ void heapKill();
 * defines
 =============================================================================*/
 #define SBRK_FAIL (void*)(-1)
+#define BRK_FAIL -1
 #define ALIGN_TO_MULT_OF_4(x) (((((x) - 1) >> 2) << 2) + 4)
 
 /*=============================================================================
