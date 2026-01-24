@@ -280,7 +280,7 @@ void printMemState(){
     Header* current = headerList;
     int index = 0;
     while(current != NULL){
-        printf("Block %d: Header at %p, Size: %zu, End: %p\n", index, current, current->size, endOfBlock(current));
+        printf("Block %d: Header at %p, Size: %zu, End: %p\n", index, (void*)current, current->size, endOfBlock(current));
         index++;
         current = current->next;
     }
