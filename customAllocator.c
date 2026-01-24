@@ -98,7 +98,7 @@ bool findBestFit(size_t neededSize, Header** predecessortoBestFit){
         current = current->next;
     }
     if(bestFitSize != (size_t)(-1)){
-        printf("Best fit found with size %zu\n", bestFitSize);
+        //printf("Best fit found with size %zu\n", bestFitSize); //DEBUG
         return true;
     } else {
         return false;
@@ -113,14 +113,14 @@ size_t followingFreeBlockSize(Header* header){
     size_t blockEnd = (size_t)endOfBlock(header);
     if(header->next == NULL){
         size_t programBreak = (size_t)sbrk(0);
-        printf("followingFreeBlockSize: header at %p, size %zu, blockEnd %p, programBreak %p, free size %zu\n", (void*)header, header->size, (void*)blockEnd, (void*)programBreak, programBreak - blockEnd);
+       // printf("followingFreeBlockSize: header at %p, size %zu, blockEnd %p, programBreak %p, free size %zu\n", (void*)header, header->size, (void*)blockEnd, (void*)programBreak, programBreak - blockEnd); //DEBUG
         return programBreak - blockEnd;
     }
     return ((size_t)header->next - blockEnd);
 }
 
 void* endOfBlock(Header* header){
-    printf("endOfBlock: header at %p, size %zu, end at %p\n", (void*)header, header->size, (void*)((size_t)header + sizeof(Header) + header->size));
+    //printf("endOfBlock: header at %p, size %zu, end at %p\n", (void*)header, header->size, (void*)((size_t)header + sizeof(Header) + header->size)); //DEBUG
     return (void*)((size_t)header + sizeof(Header) + header->size);
 }
 
@@ -147,7 +147,7 @@ void* customMalloc(size_t size){
     Header* predecessorHeader = NULL;
     void* startHeader = NULL;
     bool found_free_block = findBestFit(neededSize, &predecessorHeader);
-    printf("found best fit: %s\n", found_free_block ? "true" : "false");
+    //printf("found best fit: %s\n", found_free_block ? "true" : "false"); //DEBUG
     if(!found_free_block){
         //no free block, raise program break
         startHeader = sbrk(neededSize); 
@@ -285,12 +285,12 @@ void printMemState(){
     printf("\n\n\n-------- Memory State --------\n");
     printf("Heap Start: %p\n", heapStart);
     printf("Program Break: %p\n", sbrk(0));
-    //Header* current = headerList;
-    //int index = 0;
-    // while(current != NULL){
-    //     printf("Block %d: Header at %p, Size: %zu, End: %p\n", index, (void*)current, current->size, endOfBlock(current));
-    //     index++;
-    //     current = current->next;
-    // }
+    Header* current = headerList;
+    int index = 0;
+    while(current != NULL){
+        printf("Block %d: Header at %p, Size: %zu, End: %p\n", index, (void*)current, current->size, endOfBlock(current));
+        index++;
+        current = current->next;
+    }
     printf("-------- End of Memory State --------\n\n\n\n");
 }
