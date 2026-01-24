@@ -6,6 +6,8 @@
 #include <pthread.h> //for mutex
 #include <stdio.h> //for printf
 #include <errno.h> //for errno
+#include <unistd.h>//for brk, sbrk
+#include <stdlib.h>//for exit
 
 /*=============================================================================
 * do no edit lines below!
