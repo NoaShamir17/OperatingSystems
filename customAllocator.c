@@ -135,7 +135,6 @@ PART A
 =============================================================================*/
 
 void* customMalloc(size_t size){
-    printMemState();
     if(size == 0){
         return NULL;
     }
@@ -173,11 +172,11 @@ void* customMalloc(size_t size){
     //add to header list
     addHeaderToList(allocatedHeader, predecessorHeader);
     //return pointer to memory after header
+    printMemState();
     return (void*)((size_t)allocatedHeader + sizeof(Header));
 }
 
 void customFree(void* ptr){
-    printMemState();
     if(ptr == NULL){
         return;
     }
@@ -203,6 +202,7 @@ void customFree(void* ptr){
             return;
         }
     }
+    printMemState();
 }
 
 void* customCalloc(size_t nmemb, size_t size){
@@ -217,7 +217,6 @@ void* customCalloc(size_t nmemb, size_t size){
 }
 
 void* customRealloc(void* ptr, size_t size){
-    printMemState();
     if(ptr == NULL){
         return customMalloc(size);
     }
@@ -257,6 +256,7 @@ void* customRealloc(void* ptr, size_t size){
         customFree(ptr);
         return newPtr;
     }
+    printMemState();
     
 }
 
