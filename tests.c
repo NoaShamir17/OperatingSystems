@@ -64,7 +64,7 @@ void testBasic2(){
 }
 
 void testGapAtStart(){
-	printf("-------------Test 4----------:\n");
+	printf("-------------Test Gap At Start----------:\n");
 	char* ptrs[10];
 	for(int i = 0; i < 10; i++){
 		ptrs[i] = (char*)customMalloc(i * 10);
@@ -72,13 +72,20 @@ void testGapAtStart(){
 	}
 	customFree(ptrs[0]);
 	customFree(ptrs[1]);
+	printf("Freed ptrs[0] and ptrs[1]\n");
 	customFree(ptrs[4]);
+	printf("Freed ptrs[4]\n");
 	customFree(ptrs[7]);
+	printf("Freed ptrs[7]\n");
 	customFree(ptrs[8]);
+	printf("Freed ptrs[8]\n");
 
 	void* p1 = customMalloc(15);
+	printf("Allocated p1 of size 15 at %p\n", p1);
 	void* p2 = customMalloc(10);
+	printf("Allocated p2 of size 10 at %p\n", p2);
 	void* p3 = customMalloc(100);
+	printf("Allocated p3 of size 100 at %p\n", p3);
 
 	customFree(p1);
 	customFree(p2);
@@ -88,11 +95,11 @@ void testGapAtStart(){
 	customFree(ptrs[5]);
 	customFree(ptrs[6]);
 	customFree(ptrs[9]);
-	printf("End of Test 4\n");
+	printf("End of Test Gap At Start\n");
 }
 
 void testBestFit(){
-	printf("-------------Test Best Fit----------:\n");
+	printf("-------------Test Fat Beat----------:\n");
 	char* ptrs[20];
 	for(int i = 0; i < 20; i++){
 		ptrs[i] = (char*)customMalloc(200 - i * 10);
@@ -103,8 +110,11 @@ void testBestFit(){
 	}
 
 	void* p1 = customMalloc(50); //should fit into ptrs[2]
+	printf("Allocated p1 of size 50 at %p\n", p1);
 	void* p2 = customMalloc(80); //should fit into ptrs[10]
+	printf("Allocated p2 of size 80 at %p\n", p2);
 	void* p3 = customMalloc(30); //should fit into ptrs[0]
+	printf("Allocated p3 of size 30 at %p\n", p3);
 
 	customFree(p1);
 	customFree(p2);
@@ -114,7 +124,7 @@ void testBestFit(){
 			customFree(ptrs[i]);
 		}
 	}	
-	printf("End of Test Best Fit\n");
+	printf("End of Test Fat Beat\n");
 }
 
 void testCalloc(){
