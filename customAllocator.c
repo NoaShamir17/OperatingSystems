@@ -119,6 +119,7 @@ size_t followingFreeBlockSize(Header* header){
 }
 
 void* endOfBlock(Header* header){
+    printf("endOfBlock: header at %p, size %zu, end at %p\n", (void*)header, header->size, (void*)((size_t)header + sizeof(Header) + header->size));
     return (void*)((size_t)header + sizeof(Header) + header->size);
 }
 
