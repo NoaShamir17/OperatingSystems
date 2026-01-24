@@ -113,6 +113,7 @@ size_t followingFreeBlockSize(Header* header){
     size_t blockEnd = (size_t)endOfBlock(header);
     if(header->next == NULL){
         size_t programBreak = (size_t)sbrk(0);
+        printf("followingFreeBlockSize: header at %p, size %zu, blockEnd %p, programBreak %p, free size %zu\n", (void*)header, header->size, (void*)blockEnd, (void*)programBreak, programBreak - blockEnd);
         return programBreak - blockEnd;
     }
     return ((size_t)header->next - blockEnd);
