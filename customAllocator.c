@@ -1,16 +1,30 @@
 #include "customAllocator.h"
 
-
+//----------- in data memory space --------------------//
 static void* heapStart = NULL;
 static Header* headerList = NULL; // Your sorted list head
+static Header* headerListTail = NULL; // Your sorted list tail
+
+// for multi-threaded allocator
+static pthread_mutex_t counterMutex = PTHREAD_MUTEX_INITIALIZER;
+static int counter = 0;
+
+//------------------------------------------------//
 
 /*=============================================================================
 helper functions
 =============================================================================*/
 void heapCreate(){
     heapStart = sbrk(0);
+
+    //part B
+    pthread_mutex_init(&counterMutex, NULL);
+    for(int i = 0; i < INITIAL_REGION_NUM; i++){
+        
+    }
 }
 void heapKill(){
+    brk(heapStart); //reset brk to initial state
 }
 
 void addHeaderToList(Header* newHeader, Header* predecessorHeader){
@@ -18,6 +32,7 @@ void addHeaderToList(Header* newHeader, Header* predecessorHeader){
         headerList = newHeader;
         newHeader->prev = NULL;
         newHeader->next = NULL;
+        headerListTail = newHeader;
     } else if(predecessorHeader == NULL){
         //we add to the beginning of the list
         newHeader->next = headerList;
@@ -29,7 +44,9 @@ void addHeaderToList(Header* newHeader, Header* predecessorHeader){
         newHeader->next = predecessorHeader->next;
         newHeader->prev = predecessorHeader;
         predecessorHeader->next = newHeader;
-        if(newHeader->next != NULL){
+        if(newHeader->next == NULL){
+            headerListTail = newHeader;
+        } else{
             newHeader->next->prev = newHeader;
         }
     }
@@ -41,7 +58,9 @@ void removeHeaderFromList(Header* header){
     } else {
         headerList = header->next;
     }
-    if(header->next != NULL){
+    if(header == headerListTail){
+        headerListTail = header->prev;
+    } else {
         header->next->prev = header->prev;
     }
 }
@@ -61,6 +80,14 @@ bool findBestFit(size_t neededSize, Header** predecessortoBestFit){
             return false;
         }
     }
+    //check first gap
+    //if first gap is best fit, set predecessor to NULL and return true
+    gap_size = (size_t)headerList - (size_t)heapStart;
+    if(gap_size >= neededSize){
+        bestFitSize = gap_size;
+        *predecessortoBestFit = NULL;
+    }
+
     Header* current = headerList;
     while(current != NULL){
         gap_size = followingFreeBlockSize(current);
@@ -111,7 +138,7 @@ void* customMalloc(size_t size){
     if(size == 0){
         return NULL;
     }
-
+    size = ALIGN_TO_MULT_OF_4(size);
     size_t neededSize = size + sizeof(Header);
     Header* predecessorHeader = NULL;
     void* startHeader = NULL;
@@ -158,8 +185,13 @@ void customFree(void* ptr){
     }
     Header* headerToFree = (Header*)((size_t)ptr - sizeof(Header));
     removeHeaderFromList(headerToFree);
+    int err;
     if(endOfBlock(headerToFree) == sbrk(0)){
-        int err = brk(headerToFree); 
+        if(headerListTail == NULL){
+            err = brk(heapStart); //shrink heap to initial state
+        } else{
+            err = brk(endOfBlock(headerListTail)); //shrink heap to last allocated block
+        }
         if(err == BRK_FAIL){
             if(errno == ENOMEM){
                 outOfMemHandler();
@@ -172,7 +204,7 @@ void customFree(void* ptr){
 }
 
 void* customCalloc(size_t nmemb, size_t size){
-    size_t totalSize = nmemb * size;
+    size_t totalSize = ALIGN_TO_MULT_OF_4(nmemb * size);
     void* allocatedPtr = customMalloc(totalSize);
     if(allocatedPtr == NULL){
         return NULL;
@@ -194,6 +226,7 @@ void* customRealloc(void* ptr, size_t size){
         customFree(ptr);
         return NULL;
     }
+    size = ALIGN_TO_MULT_OF_4(size); // align size to multiple of 4
     Header* currentHeader = (Header*)((size_t)ptr - sizeof(Header));
     if(currentHeader->size >= size){
         if(endOfBlock(currentHeader) == sbrk(0)){
@@ -232,4 +265,6 @@ PART A JOVER
 PART B
 =============================================================================*/
 
+void* customMTMalloc(size_t size){
 
+}

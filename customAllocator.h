@@ -38,6 +38,8 @@ void heapKill();
 #define SBRK_FAIL (void*)(-1)
 #define BRK_FAIL -1
 #define ALIGN_TO_MULT_OF_4(x) (((((x) - 1) >> 2) << 2) + 4)
+#define REGION_SIZE ((1 << 12) + sizeof(Header) + sizeof(pthread_mutex_t)) //4KB + header size + mutex size
+#define INITIAL_REGION_NUM 8 //minimum number of regions to allocate at heap creation
 
 /*=============================================================================
 * Block
@@ -59,7 +61,8 @@ void addHeaderToList(Header* newHeader, Header* predecessorHeader);
 void removeHeaderFromList(Header* header);
 bool findBestFit(size_t neededSize, Header** predecessortoBestFit);
 void* endOfBlock(Header* header);
-
+size_t followingFreeBlockSize(Header* header);
+void outOfMemHandler();
 
 
 #endif // CUSTOM_ALLOCATOR
