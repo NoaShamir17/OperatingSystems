@@ -144,6 +144,7 @@ void* customMalloc(size_t size){
     Header* predecessorHeader = NULL;
     void* startHeader = NULL;
     bool found_free_block = findBestFit(neededSize, &predecessorHeader);
+    printf("found best fit: %s\n", found_free_block ? "true" : "false");
     if(!found_free_block){
         //no free block, raise program break
         startHeader = sbrk(neededSize); 
