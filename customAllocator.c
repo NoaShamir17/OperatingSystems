@@ -98,6 +98,7 @@ bool findBestFit(size_t neededSize, Header** predecessortoBestFit){
         current = current->next;
     }
     if(bestFitSize != (size_t)(-1)){
+        printf("Best fit found with size %zu\n", bestFitSize);
         return true;
     } else {
         return false;
