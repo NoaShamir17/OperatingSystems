@@ -85,39 +85,39 @@ void heapKill(){
 
 //------------ Part A helper functions -----------------//
 
-void addHeaderToList(Header* newHeader, Header* predecessorHeader){
-    if(headerList_PartA == NULL){
-        headerList_PartA = newHeader;
+void addHeaderToList(Header* newHeader, Header* predecessorHeader, Header** headerList, Header** headerListTail){
+    if(*headerList == NULL){
+        *headerList = newHeader;
         newHeader->prev = NULL;
         newHeader->next = NULL;
-        headerListTail_PartA = newHeader;
+        *headerListTail  = newHeader;
     } else if(predecessorHeader == NULL){
         //we add to the beginning of the list
-        newHeader->next = headerList_PartA;
+        newHeader->next = *headerList;
         newHeader->prev = NULL;
-        headerList_PartA->prev = newHeader;
-        headerList_PartA = newHeader;
+        (*headerList)->prev = newHeader;
+        *headerList = newHeader;
     } else {
         //we get a predecessor header
         newHeader->next = predecessorHeader->next;
         newHeader->prev = predecessorHeader;
         predecessorHeader->next = newHeader;
         if(newHeader->next == NULL){
-            headerListTail_PartA = newHeader;
+            *headerListTail = newHeader;
         } else{
             newHeader->next->prev = newHeader;
         }
     }
 }
 
-void removeHeaderFromList(Header* header){
+void removeHeaderFromList(Header* header, Header** headerList, Header** headerListTail){
     if(header->prev != NULL){
         header->prev->next = header->next;
     } else {
-        headerList_PartA = header->next;
+        *headerList = header->next;
     }
-    if(header == headerListTail_PartA){
-        headerListTail_PartA = header->prev;
+    if(header == *headerListTail){
+        *headerListTail = header->prev;
     } else {
         header->next->prev = header->prev;
     }
@@ -192,11 +192,20 @@ void outOfMemHandler(){
 }
 
 
+
 //------------ Part B helper functions -----------------//
 
 RegionHeader* findRegion(int regionIndex){
     void* regionStart = (void*)((size_t)heapStart + regionIndex * REGION_SIZE);
     return (RegionHeader*)regionStart;
+}
+
+size_t getRegionStartAddress(int regionIndex){
+    return (size_t)heapStart + regionIndex * REGION_SIZE + sizeof(RegionHeader);
+}
+
+size_t getRegionEndAddress(int regionIndex){
+    return (size_t)heapStart + (regionIndex + 1) * REGION_SIZE;
 }
 
 
@@ -220,6 +229,28 @@ void unlockRegion(int regionIndex){
     pthread_mutex_unlock(regionMutex);
 }
 
+bool addNewRegion(){
+    pthread_mutex_lock(&regionCountMutex);
+    void* err = sbrk(REGION_SIZE);
+    if(err == SBRK_FAIL){
+        pthread_mutex_unlock(&regionCountMutex);
+        if(errno == ENOMEM){
+            outOfMemHandler();
+        } else {
+            printf("<sbrk error>: bad sbrk args\n");
+            return false;
+        }
+    }
+    //initialize new region
+    RegionHeader* newRegionHeader = findRegion(regionCount);
+    pthread_mutex_init(&(newRegionHeader->regionMutex), NULL);
+    newRegionHeader->headerList = NULL;
+    newRegionHeader->headerListTail = NULL;
+
+    regionCount++;
+    pthread_mutex_unlock(&regionCountMutex);
+    return true;
+}
 
 /*=============================================================================
 PART A
@@ -271,7 +302,7 @@ void* customMalloc(size_t size){
     //set header info
     allocatedHeader->size = size;
     //add to header list
-    addHeaderToList(allocatedHeader, predecessorHeader);
+    addHeaderToList(allocatedHeader, predecessorHeader, &headerList_PartA, &headerListTail_PartA);
     //return pointer to memory after header
     printMemState();
     return (void*)((size_t)allocatedHeader + sizeof(Header));
@@ -288,7 +319,7 @@ void customFree(void* ptr){
         return;
     }
     Header* headerToFree = (Header*)((size_t)ptr - sizeof(Header));
-    removeHeaderFromList(headerToFree);
+    removeHeaderFromList(headerToFree, &headerList_PartA, &headerListTail_PartA);
     int err;
     if(endOfBlock(headerToFree) == sbrk(0)){
         if(headerListTail_PartA == NULL){
@@ -377,48 +408,53 @@ void* customMTMalloc(size_t size){
     }
     size = ALIGN_TO_MULT_OF_4(size);
     size_t neededSize = size + sizeof(Header);
+
+    //find region to allocate from
+    //for each region, if we dont find a free block, we move to the next region and add a new region.
+    bool found_region = false;
     Header* predecessorHeader = NULL;
     void* startHeader = NULL;
-    int regionIndex = getAndIncrementCounter();
-    lockRegion(regionIndex);
-    Header** regionHeaderList = (Header**)findRegionHeaderList(regionIndex);
-    bool found_free_block = findBestFit(neededSize, &predecessorHeader); 
-    //printf("found best fit: %s\n", found_free_block ? "true" : "false"); //DEBUG
-    if(!found_free_block){//TODO: part B adjustment
-        //no free block, raise program break
-        predecessorHeader = headerListTail_PartA;
-        startHeader = sbrk(neededSize); 
-        if(startHeader == SBRK_FAIL){
-            if(errno == ENOMEM){
-                outOfMemHandler();
-            } else {
-                printf("<sbrk error>: bad sbrk args\n");
-                return NULL;
-            }
-        }
-    }
-    else {
-        //found free block
-        if(predecessorHeader == NULL){
-            //free block is at the beginning of the heap
-            startHeader = heapStart; //TODO: part B adjustment
-        } else {
-            //free block is after predecessorHeader
-            startHeader = endOfBlock(predecessorHeader);
-        }
-    }
 
-    Header* allocatedHeader = (Header*)startHeader;
-    //set header info
-    allocatedHeader->size = size;
-    //add to header list
-    addHeaderToList(allocatedHeader, predecessorHeader); //TODO: part B adjustment
-    //return pointer to memory after header
-    printMemState(); //TODO: part B adjustment
-    return (void*)((size_t)allocatedHeader + sizeof(Header));
+    while(!found_region){
+        int regionIndex = getAndIncrementCounter();
+        lockRegion(regionIndex);
+        RegionHeader* regionHeader = findRegion(regionIndex);
+        bool found_free_block = findBestFit(getRegionStartAddress(regionIndex),
+                                            getRegionEndAddress(regionIndex),
+                                            regionHeader->headerList,
+                                            neededSize,
+                                            &predecessorHeader);
+        if(found_free_block){
+            found_region = true;
+            //proceed to allocation in this region
+            startHeader = NULL;
+            if(predecessorHeader == NULL){
+                //free block is at the beginning of the region
+                startHeader = (void*)((size_t)regionHeader + sizeof(RegionHeader));
+            } else {
+                //free block is after predecessorHeader
+                startHeader = endOfBlock(predecessorHeader);
+            }
+            Header* allocatedHeader = (Header*)startHeader;
+            //set header info
+            allocatedHeader->size = size;
+            //add to header list
+            addHeaderToList(allocatedHeader, predecessorHeader, &(regionHeader->headerList), &(regionHeader->headerListTail));
+            //return pointer to memory after header
+            printMemState();
+            unlockRegion(regionIndex);
+            return (void*)((size_t)allocatedHeader + sizeof(Header));
+        }
+        unlockRegion(regionIndex);
+        bool addedNewRegion = addNewRegion(); //adds a new region at the end of the heap
+        if(!addedNewRegion){
+            return NULL;
+        }
+    };
+    return NULL; //should never reach here
 }
 
-void customFree(void* ptr){
+void customMTFree(void* ptr){
     if(ptr == NULL){
         printMemState();
         return;

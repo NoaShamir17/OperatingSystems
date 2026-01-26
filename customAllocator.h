@@ -43,7 +43,8 @@ void heapKill();
 #define ALIGN_TO_MULT_OF_4(x) (((((x) - 1) >> 2) << 2) + 4)
 
 // Region size = mutex size + pointer to first header + pointer to last header + header size  + 4KB region size
-#define REGION_SIZE (sizeof(RegionHeader) + (1 << 12)) 
+//we add the sizeof(header) bc max block allocated is 4KB, and we want to be able to allocate a block of 4KB in the region + its header
+#define REGION_SIZE (sizeof(RegionHeader) + sizeof(Header) + (1 << 12)) 
 #define INITIAL_REGION_NUM 8 //minimum number of regions to allocate at heap creation
 /*=============================================================================
 * Structs
