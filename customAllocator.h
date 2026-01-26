@@ -41,11 +41,14 @@ void heapKill();
 #define SBRK_FAIL (void*)(-1)
 #define BRK_FAIL -1
 #define ALIGN_TO_MULT_OF_4(x) (((((x) - 1) >> 2) << 2) + 4)
-#define REGION_SIZE ((1 << 12) + sizeof(Header) + sizeof(pthread_mutex_t)) //4KB + header size + mutex size
+
+// Region size = mutex size + pointer to first header + pointer to last header + header size  + 4KB region size
+#define REGION_SIZE (sizeof(RegionHeader) + (1 << 12)) 
 #define INITIAL_REGION_NUM 8 //minimum number of regions to allocate at heap creation
 /*=============================================================================
-* Block
+* Structs
 =============================================================================*/
+
 //Header point to the metadata for each allocated block
 // It is stored at the beginning of each block
 typedef struct Header
@@ -55,17 +58,29 @@ typedef struct Header
     struct Header* next;
 } Header;
 
-//list of ALLOCATED blocks
-//list is sorted by address (header address)
+typedef struct RegionHeader{
+    pthread_mutex_t regionMutex;
+    Header* headerList;
+    Header* headerListTail;
+} RegionHeader;
 
 //helper functions for linked list management
 void addHeaderToList(Header* newHeader, Header* predecessorHeader);
 void removeHeaderFromList(Header* header);
-bool findBestFit(size_t neededSize, Header** predecessortoBestFit);
+
+//helper functions for memory management
+bool findBestFit(void* regionStart, void* regionEnd, Header* headerList, size_t neededSize, Header** predecessortoBestFit);
 void* endOfBlock(Header* header);
-size_t followingFreeBlockSize(Header* header);
+size_t followingFreeBlockSize(Header* header, void* regionEnd);
 void outOfMemHandler();
 void printMemState();
+
+//part B helper functions
+RegionHeader* findRegion(int regionIndex);
+int getAndIncrementCounter();
+void lockRegion(int regionIndex);
+void unlockRegion(int regionIndex);
+
 
 
 #endif // CUSTOM_ALLOCATOR
