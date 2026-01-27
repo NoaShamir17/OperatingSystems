@@ -232,6 +232,8 @@ void unlockRegion(int regionIndex){
 bool addNewRegion(){
     pthread_mutex_lock(&regionCountMutex);
     void* err = sbrk(REGION_SIZE);
+    //printf("Adding new region at index %d\n", regionCount); //DEBUG
+    //printf("sbrk returned %p\n", err); //DEBUG
     if(err == SBRK_FAIL){
         pthread_mutex_unlock(&regionCountMutex);
         if(errno == ENOMEM){
@@ -413,6 +415,11 @@ void* customMTMalloc(size_t size){
     if(size == 0){
         return NULL;
     }
+    if(size > 4096){
+    	printf("malloc too big\n");//DEBUG
+            return NULL;
+        }
+
     size = ALIGN_TO_MULT_OF_4(size);
     size_t neededSize = size + sizeof(Header);
 
@@ -535,15 +542,15 @@ DEBUG FUNCTIONS
 //TODO: add global is part B or part A
 // if part B go over all regions
 void printMemState(){
-    printf("\n\n\n-------- Memory State --------\n");
-    printf("Heap Start: %p\n", heapStart);
-    printf("Program Break: %p\n", sbrk(0));
-    Header* current = headerList_PartA;
-    int index = 0;
-    while(current != NULL){
-        printf("Block %d: Header at %p, Size: %zu, End: %p\n", index, (void*)current, current->size, endOfBlock(current));
-        index++;
-        current = current->next;
-    }
-    printf("-------- End of Memory State --------\n\n\n\n");
+//    printf("\n\n\n-------- Memory State --------\n");
+//    printf("Heap Start: %p\n", heapStart);
+//    printf("Program Break: %p\n", sbrk(0));
+//    Header* current = headerList_PartA;
+//    int index = 0;
+//    while(current != NULL){
+//        printf("Block %d: Header at %p, Size: %zu, End: %p\n", index, (void*)current, current->size, endOfBlock(current));
+//        index++;
+//        current = current->next;
+//    }
+//    printf("-------- End of Memory State --------\n\n\n\n");
 }
