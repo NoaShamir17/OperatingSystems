@@ -260,6 +260,10 @@ RegionHeader* getRegionByAdress(Header* addr){
     return regionHeader; //address not in any region
 }
 
+//DEBUG
+int getRegionIndexByAdress(Header* addr){
+    return ((size_t)addr - (size_t)heapStart) / REGION_SIZE;
+}
 /*=============================================================================
 PART A
 =============================================================================*/

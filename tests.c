@@ -159,3 +159,45 @@ void testRealloc(){
 	customFree(arr);
 	printf("End of Test Realloc\n");
 }
+
+//----------------Multi Threaded Tests----------:
+#define THREADS_NUM 10
+#define ALLOCS_PER_THREAD 100
+#define MAX_ALLOC_SIZE 4096 //4KB
+void* getRegionEndAddress(int regionIndex);
+
+
+void testMTMallocFree(){
+	printf("-------------Test MT Malloc Free----------:\n");
+	
+	pthread_t threads[THREADS_NUM];
+	for(int i = 0; i < THREADS_NUM; i++){
+		pthread_create(&threads[i], NULL, threadAllocFreeRoutine, NULL);
+	}
+	for(int i = 0; i < THREADS_NUM; i++){
+		pthread_join(threads[i], NULL);
+	}
+	printf("End of Test MT Malloc Free\n");
+}
+
+void* threadAllocFreeRoutine(void* arg){
+	void* ptrs[ALLOCS_PER_THREAD];
+	for(int i = 0; i < ALLOCS_PER_THREAD; i++){
+		size_t size = (rand() % MAX_ALLOC_SIZE) + 1;
+		ptrs[i] = customMTMalloc(size);
+		printf("Thread %lu: Allocated ptrs[%d] of size %zu at %p\n in region %d", pthread_self(), i, size, ptrs[i], getRegionIndexByAdress((Header*)((size_t)ptrs[i] - sizeof(Header))));
+	}
+	//write and read to allocated memory
+	for(int i = 0; i < ALLOCS_PER_THREAD; i++){
+		if(ptrs[i] != NULL){
+			*(char*)ptrs[i] = 'a';
+			printf("Thread %lu: Wrote to ptrs[%d] at %p\n in region %d", pthread_self(), i, ptrs[i], getRegionIndexByAdress((Header*)((size_t)ptrs[i] - sizeof(Header))));
+		}
+	}
+
+	for(int i = 0; i < ALLOCS_PER_THREAD; i++){
+		customMTFree(ptrs[i]);
+		printf("Thread %lu: Freed ptrs[%d] at %p\n in region %d", pthread_self(), i, ptrs[i], getRegionIndexByAdress((Header*)((size_t)ptrs[i] - sizeof(Header))));
+	}
+	return NULL;
+}
