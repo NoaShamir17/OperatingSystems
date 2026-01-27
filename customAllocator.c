@@ -200,12 +200,12 @@ RegionHeader* findRegion(int regionIndex){
     return (RegionHeader*)regionStart;
 }
 
-size_t getRegionStartAddress(int regionIndex){
-    return (size_t)heapStart + regionIndex * REGION_SIZE + sizeof(RegionHeader);
+void* getRegionStartAddress(int regionIndex){
+    return (void*)((size_t)heapStart + regionIndex * REGION_SIZE + sizeof(RegionHeader));
 }
 
-size_t getRegionEndAddress(int regionIndex){
-    return (size_t)heapStart + (regionIndex + 1) * REGION_SIZE;
+void* getRegionEndAddress(int regionIndex){
+    return (void*)((size_t)heapStart + (regionIndex + 1) * REGION_SIZE);
 }
 
 

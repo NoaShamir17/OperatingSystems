@@ -82,6 +82,8 @@ RegionHeader* findRegion(int regionIndex);
 int getAndIncrementCounter();
 void lockRegion(int regionIndex);
 void unlockRegion(int regionIndex);
+void* getRegionStartAddress(int regionIndex);
+void* getRegionEndAddress(int regionIndex);
 bool addNewRegion();
 RegionHeader* getRegionByAdress(Header* addr);
 
