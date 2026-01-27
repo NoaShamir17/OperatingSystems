@@ -474,9 +474,9 @@ void customMTFree(void* ptr){
     }
     Header* headerToFree = (Header*)((size_t)ptr - sizeof(Header));
     RegionHeader* regionHeader = getRegionByAdress((Header*)headerToFree);
-    lockRegion(regionHeader);
+    pthread_mutex_lock(&(regionHeader->regionMutex));
     removeHeaderFromList(headerToFree, &(regionHeader->headerList), &(regionHeader->headerListTail));
-    unlockRegion(regionHeader);
+    pthread_mutex_unlock(&(regionHeader->regionMutex));
     printMemState();
 }
 
@@ -507,14 +507,14 @@ void* customMTRealloc(void* ptr, size_t size){
     size = ALIGN_TO_MULT_OF_4(size); // align size to multiple of 4
     Header* currentHeader = (Header*)((size_t)ptr - sizeof(Header));
     RegionHeader* regionHeader = getRegionByAdress((Header*)currentHeader);
-    lockRegion(regionHeader);
+    pthread_mutex_lock(&(regionHeader->regionMutex));
     if(currentHeader->size >= size){
         //just decrease size
         currentHeader->size = size;
-        unlockRegion(regionHeader);
+        pthread_mutex_unlock(&(regionHeader->regionMutex));
         return ptr;
     } else {
-        unlockRegion(regionHeader);
+        pthread_mutex_unlock(&(regionHeader->regionMutex));
         void* newPtr = customMTMalloc(size);
         if(newPtr == NULL){
             return NULL;
