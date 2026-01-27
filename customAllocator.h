@@ -66,8 +66,9 @@ typedef struct RegionHeader{
 } RegionHeader;
 
 //helper functions for linked list management
-void addHeaderToList(Header* newHeader, Header* predecessorHeader);
-void removeHeaderFromList(Header* header);
+//Protected on the caller side in multi-threaded functions
+void addHeaderToList(Header* newHeader, Header* predecessorHeader, Header** headerList, Header** headerListTail);
+void removeHeaderFromList(Header* headerToRemove, Header** headerList,  Header** headerListTail);
 
 //helper functions for memory management
 bool findBestFit(void* regionStart, void* regionEnd, Header* headerList, size_t neededSize, Header** predecessortoBestFit);
@@ -81,6 +82,8 @@ RegionHeader* findRegion(int regionIndex);
 int getAndIncrementCounter();
 void lockRegion(int regionIndex);
 void unlockRegion(int regionIndex);
+bool addNewRegion();
+RegionHeader* getRegionByAdress(Header* addr);
 
 
 

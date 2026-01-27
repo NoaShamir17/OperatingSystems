@@ -252,6 +252,12 @@ bool addNewRegion(){
     return true;
 }
 
+RegionHeader* getRegionByAdress(Header* addr){
+    int regionIndex = ((size_t)addr - (size_t)heapStart) / REGION_SIZE;
+    RegionHeader* regionHeader = findRegion(regionIndex);
+    return regionHeader; //address not in any region
+}
+
 /*=============================================================================
 PART A
 =============================================================================*/
@@ -310,6 +316,7 @@ void* customMalloc(size_t size){
 
 void customFree(void* ptr){
     if(ptr == NULL){
+        printf("<free error>: passed null pointer\n");
         printMemState();
         return;
     }
@@ -456,6 +463,7 @@ void* customMTMalloc(size_t size){
 
 void customMTFree(void* ptr){
     if(ptr == NULL){
+        printf("<free error>: passed null pointer\n");
         printMemState();
         return;
     }
@@ -465,30 +473,67 @@ void customMTFree(void* ptr){
         return;
     }
     Header* headerToFree = (Header*)((size_t)ptr - sizeof(Header));
-    removeHeaderFromList(headerToFree);
-    int err;
-    if(endOfBlock(headerToFree) == sbrk(0)){
-        if(headerListTail_PartA == NULL){
-            err = brk(heapStart); //shrink heap to initial state
-        } else{
-            err = brk(endOfBlock(headerListTail_PartA)); //shrink heap to last allocated block
-        }
-        if(err == BRK_FAIL){
-            if(errno == ENOMEM){
-                outOfMemHandler();
-            } else {
-                printf("<brk error>: bad brk args\n");
-            }
-            printMemState();
-            return;
-        }
+    RegionHeader* regionHeader = getRegionByAdress((Header*)headerToFree);
+    lockRegion(regionHeader);
+    removeHeaderFromList(headerToFree, &(regionHeader->headerList), &(regionHeader->headerListTail));
+    unlockRegion(regionHeader);
+    printMemState();
+}
+
+void* customMTCalloc(size_t nmemb, size_t size){
+    size_t totalSize = ALIGN_TO_MULT_OF_4(nmemb * size);
+    void* allocatedPtr = customMTMalloc(totalSize);
+    if(allocatedPtr == NULL){
+        return NULL;
     }
+    //initialize memory to zero
+    memset(allocatedPtr, 0, totalSize);
+    return allocatedPtr;
+}
+
+//TODO: think of the many edge cases here
+void* customMTRealloc(void* ptr, size_t size){
+    if(ptr == NULL){
+        return customMTMalloc(size);
+    }
+    if((size_t)ptr < (size_t)heapStart || (size_t)ptr >= (size_t)sbrk(0)){
+        printf("<realloc error>: passed non-heap pointer\n");
+        return NULL;
+    }
+    if(size == 0){
+        customMTFree(ptr);
+        return NULL;
+    }
+    size = ALIGN_TO_MULT_OF_4(size); // align size to multiple of 4
+    Header* currentHeader = (Header*)((size_t)ptr - sizeof(Header));
+    RegionHeader* regionHeader = getRegionByAdress((Header*)currentHeader);
+    lockRegion(regionHeader);
+    if(currentHeader->size >= size){
+        //just decrease size
+        currentHeader->size = size;
+        unlockRegion(regionHeader);
+        return ptr;
+    } else {
+        unlockRegion(regionHeader);
+        void* newPtr = customMTMalloc(size);
+        if(newPtr == NULL){
+            return NULL;
+        }
+        //copy old data to new block
+        memcpy(newPtr, ptr, currentHeader->size);
+        customMTFree(ptr);
+        return newPtr;
+    }
+    printMemState();
+    
 }
 
 /*=============================================================================
 DEBUG FUNCTIONS
 =============================================================================*/
 
+//TODO: add global is part B or part A
+// if part B go over all regions
 void printMemState(){
     printf("\n\n\n-------- Memory State --------\n");
     printf("Heap Start: %p\n", heapStart);
