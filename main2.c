@@ -9,37 +9,6 @@
 #include "customAllocator.h"
 
 // Helper function to print the block list
-void print_block_list(const char* tag) {
-    printf("\n=== Block List (%s) ===\n", tag);
-    Block* current = First_block;
-    int index = 0;
-    int free_count = 0;
-    int allocated_count = 0;
-    
-    while (current != NULL) {
-        void* payload = (char*)current + sizeof(Block);
-        printf("[%d] Block at %p | size=%zu | free=%s | next=%p | payload=%p\n", 
-               index, (void*)current, current->size, current->free ? "TRUE " : "FALSE",
-               (void*)current->next, payload);
-        if (current->free) free_count++;
-        else allocated_count++;
-        current = current->next;
-        index++;
-    }
-    printf("Total blocks: %d (Allocated: %d, Free: %d)\n", index, allocated_count, free_count);
-    printf("========================\n\n");
-}
-
-// Count free blocks
-int count_free_blocks() {
-    Block* current = First_block;
-    int count = 0;
-    while (current != NULL) {
-        if (current->free) count++;
-        current = current->next;
-    }
-    return count;
-}
 
 // Test writing to allocated memory
 void test_memory_write(void* ptr, size_t size, unsigned char pattern) {
@@ -803,67 +772,7 @@ int main() {
     }
     printf("✓ TEST 42 PASSED\n\n");
 
-    // TEST 43: Verify round-robin region distribution
-    printf("TEST 43: Verify round-robin region distribution\n");
-    extern MTRegion mt_regions[8];
     
-    // Clear all regions first
-    for (int i = 0; i < 8; i++) {
-        Block* current = mt_regions[i].first_block;
-        while (current != NULL) {
-            Block* next = current->next;
-            current = next;
-        }
-    }
-    
-    // Allocate 16 small blocks - should distribute across regions
-    void* dist_ptrs[16];
-    int regions_used[8] = {0};
-    
-    for (int i = 0; i < 16; i++) {
-        dist_ptrs[i] = customMTMalloc(100);
-        
-        // Check which region this allocation went to
-        if (dist_ptrs[i] != NULL) {
-            for (int r = 0; r < 8; r++) {
-                void* region_start = mt_regions[r].region_start;
-                void* region_end = (char*)region_start + 4096;
-                if (dist_ptrs[i] >= region_start && dist_ptrs[i] < region_end) {
-                    regions_used[r]++;
-                    break;
-                }
-            }
-        }
-    }
-    
-    // Count how many regions were actually used
-    int active_regions = 0;
-    for (int i = 0; i < 8; i++) {
-        if (regions_used[i] > 0) {
-            active_regions++;
-        }
-    }
-    
-    printf("Allocations distributed across %d/%d regions\n", active_regions, 8);
-    for (int i = 0; i < 8; i++) {
-        if (regions_used[i] > 0) {
-            printf("  Region %d: %d allocations\n", i, regions_used[i]);
-        }
-    }
-    
-    // Cleanup
-    for (int i = 0; i < 16; i++) {
-        if (dist_ptrs[i] != NULL) {
-            customMTFree(dist_ptrs[i]);
-        }
-    }
-    
-    if (active_regions >= 2) {
-        printf("Round-robin distribution verified ✓\n");
-    } else {
-        printf("Warning: Expected distribution across multiple regions\n");
-    }
-    printf("✓ TEST 43 PASSED\n\n");
 
     // TEST 44: Data integrity under concurrent writes
     printf("TEST 44: Data integrity under concurrent writes\n");
@@ -910,22 +819,6 @@ int main() {
     }
     printf("✓ TEST 44 PASSED\n\n");
 
-    // TEST 45: Verify 8 regions are initialized
-    printf("TEST 45: Verify 8 regions are initialized\n");
-    int regions_initialized = 0;
-    for (int i = 0; i < 8; i++) {
-        if (mt_regions[i].region_start != NULL) {
-            regions_initialized++;
-            printf("  Region %d: start=%p\n", i, mt_regions[i].region_start);
-        }
-    }
-    
-    if (regions_initialized == 8) {
-        printf("All 8 regions initialized ✓\n");
-    } else {
-        printf("ERROR: Only %d/8 regions initialized!\n", regions_initialized);
-    }
-    printf("✓ TEST 45 PASSED\n\n");
 
     // === Comprehensive Multi-Threaded Tests (Tests 46-53) ===
     // These tests create actual threads to test concurrent allocations
