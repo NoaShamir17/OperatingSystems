@@ -185,14 +185,16 @@ void* threadAllocFreeRoutine(void* arg){
 	for(int i = 0; i < ALLOCS_PER_THREAD; i++){
 		size_t size = (rand() % MAX_ALLOC_SIZE) + 1;
 		ptrs[i] = customMTMalloc(size);
+		print(" Malloc %s\n", ptrs[i] != NULL ? "succeeded" : "failed");
 		printf("Thread %lu: Allocated ptrs[%d] of size %zu at %p\n in region %d\n", pthread_self(), i, size, ptrs[i], getRegionIndexByAdress((Header*)((size_t)ptrs[i] - sizeof(Header))));
-		printf("the char is: %c\n", ptrs[i] != NULL ? *((char*)ptrs[i]) : ' '); 
+		
 	}
 	//write and read to allocated memory
 	for(int i = 0; i < ALLOCS_PER_THREAD; i++){
 		if(ptrs[i] != NULL){
 			*(char*)ptrs[i] = 'a';
 			printf("Thread %lu: Wrote to ptrs[%d] at %p\n in region %d\n", pthread_self(), i, ptrs[i], getRegionIndexByAdress((Header*)((size_t)ptrs[i] - sizeof(Header))));
+			printf("the char is: %c\n", ptrs[i] != NULL ? *((char*)ptrs[i]) : ' '); 
 		}
 	}
 
