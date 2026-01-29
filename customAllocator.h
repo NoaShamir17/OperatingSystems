@@ -86,7 +86,7 @@ void* getRegionStartAddress(int regionIndex);
 void* getRegionEndAddress(int regionIndex);
 bool addNewRegion();
 RegionHeader* getRegionByAdress(Header* addr);
-
+int getRegionIndexByAdress(Header* addr);
 
 
 #endif // CUSTOM_ALLOCATOR
