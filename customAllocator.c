@@ -49,6 +49,7 @@ void heapCreate(){
 
 void heapKill(){
     //destroy mutexes only for first function call (in part A its called twice - in first malloc and at program end)
+    //TODO: maybe turm this true after each call to heapCreate incase of multiple create-kill cycles
     static bool isFirstCall = true;
     if(isFirstCall){
         //destroy all region mutexes

@@ -10,6 +10,8 @@ void testGapAtStart();
 void testBestFit();
 void testCalloc();
 void testRealloc();
+void testMTMallocFree();
+void* threadAllocFreeRoutine(void* arg);
 
 
 #endif

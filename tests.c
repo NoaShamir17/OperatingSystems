@@ -186,6 +186,7 @@ void* threadAllocFreeRoutine(void* arg){
 		size_t size = (rand() % MAX_ALLOC_SIZE) + 1;
 		ptrs[i] = customMTMalloc(size);
 		printf("Thread %lu: Allocated ptrs[%d] of size %zu at %p\n in region %d", pthread_self(), i, size, ptrs[i], getRegionIndexByAdress((Header*)((size_t)ptrs[i] - sizeof(Header))));
+		printf("the char is: %c\n", ptrs[i] != NULL ? *((char*)ptrs[i]) : ' '); 
 	}
 	//write and read to allocated memory
 	for(int i = 0; i < ALLOCS_PER_THREAD; i++){
