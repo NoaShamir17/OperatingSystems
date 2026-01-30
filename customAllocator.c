@@ -518,7 +518,6 @@ void* customMTRealloc(void* ptr, size_t size){
     }
     size = ALIGN_TO_MULT_OF_4(size); // align size to multiple of 4
     Header* currentHeader = (Header*)((size_t)ptr - sizeof(Header));
-    RegionHeader* regionHeader = getRegionByAdress((Header*)currentHeader);
     if(currentHeader->size >= size){
         //just decrease size
         currentHeader->size = size;
