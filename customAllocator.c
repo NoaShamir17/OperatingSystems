@@ -10,6 +10,7 @@ static int counter = 0;
 static pthread_mutex_t counterMutex = PTHREAD_MUTEX_INITIALIZER;
 static int regionCount = 0;
 static pthread_mutex_t regionCountMutex = PTHREAD_MUTEX_INITIALIZER;
+static bool isHeapKillFirstCalled = true;
 
 //------------------------------------------------//
 
@@ -18,6 +19,7 @@ helper functions
 =============================================================================*/
 void heapCreate(){
     heapStart = sbrk(0);
+    isHeapKillFirstCalled = true;
 
     //part B
     pthread_mutex_init(&counterMutex, NULL);
@@ -49,9 +51,7 @@ void heapCreate(){
 
 void heapKill(){
     //destroy mutexes only for first function call (in part A its called twice - in first malloc and at program end)
-    //TODO: maybe turm this true after each call to heapCreate incase of multiple create-kill cycles
-    static bool isFirstCall = true;
-    if(isFirstCall){
+    if(isHeapKillFirstCalled){
         //destroy all region mutexes
         //first, lock regionCountMutex to read regionCount safely
         pthread_mutex_lock(&regionCountMutex);
@@ -64,7 +64,7 @@ void heapKill(){
         //destroy global mutexes
         pthread_mutex_destroy(&counterMutex);
         pthread_mutex_destroy(&regionCountMutex);
-        isFirstCall = false;
+        isHeapKillFirstCalled = false;
     }
 
 
@@ -519,14 +519,11 @@ void* customMTRealloc(void* ptr, size_t size){
     size = ALIGN_TO_MULT_OF_4(size); // align size to multiple of 4
     Header* currentHeader = (Header*)((size_t)ptr - sizeof(Header));
     RegionHeader* regionHeader = getRegionByAdress((Header*)currentHeader);
-    pthread_mutex_lock(&(regionHeader->regionMutex));
     if(currentHeader->size >= size){
         //just decrease size
         currentHeader->size = size;
-        pthread_mutex_unlock(&(regionHeader->regionMutex));
         return ptr;
     } else {
-        pthread_mutex_unlock(&(regionHeader->regionMutex));
         void* newPtr = customMTMalloc(size);
         if(newPtr == NULL){
             return NULL;
@@ -544,7 +541,6 @@ void* customMTRealloc(void* ptr, size_t size){
 DEBUG FUNCTIONS
 =============================================================================*/
 
-//TODO: add global is part B or part A
 // if part B go over all regions
 void printMemState(){
 //    printf("\n\n\n-------- Memory State --------\n");
