@@ -271,11 +271,9 @@ PART A
 
 
 void* customMalloc(size_t size){
-    static bool isInitialized = false;
     //the first time we call part A customMalloc, we pull PB to heapStart
-    if(!isInitialized){
+    if(isHeapKillFirstCalled){
         heapKill(); //reset brk to initial state
-        isInitialized = true;
     }
 
     if(size == 0){
