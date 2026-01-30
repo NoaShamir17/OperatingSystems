@@ -13,7 +13,11 @@ int main() {
     testCalloc();
     testRealloc();
     testFreeErr();
+    heapKill();
+    heapCreate();
     testMTMallocFree();
+    heapKill();
+    heapCreate();
     main2();
     heapKill();
     return 0;

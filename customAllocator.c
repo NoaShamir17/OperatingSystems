@@ -38,6 +38,7 @@ void heapCreate(){
 
     //update region count
     regionCount = INITIAL_REGION_NUM;
+    counter = 0;
 
     //initialize mutexes for each region, and their header lists to NULL
     for(int i = 0; i < INITIAL_REGION_NUM; i++){
