@@ -1,0 +1,4405 @@
+Gemini 3 - Pro 
+we only gave it the wet 3 instructions file as file inputs in the entire conversation
+
+i have a question about realloc when size < old_size, why wouldnt it sucseed freeing memory? when would we need to allocate a new block for this case and why?
+
+Based on the assignment instructions, here is the explanation for why shrinking a memory block (size < old_size) might not succeed in-place, and why a new allocation is required in that specific case.
+
+1. Why wouldn't it succeed in freeing memory in-place?
+The system cannot always just "chop off" the end of a block to free it. To free the excess memory (the difference between old_size and size), the allocator must be able to turn that remainder into a new, independent "free block" and add it to the linked list.
+
+This process ("splitting") will fail if the remainder is too small.
+
+
+Metadata Overhead: Every block in your linked list usually requires a "header" or metadata to track information like its size and the pointer to the next block. If the leftover space is smaller than the size of this metadata, you cannot create a valid block structure there.
+
+
+Alignment Constraints: The assignment requires all memory allocations to be multiples of 4 bytes. If the split would result in a block that violates this alignment or leaves a "sliver" of memory too small to be useful (e.g., 1 or 2 bytes), the split is rejected.
+
+2. When would we need to allocate a new block?
+According to the assignment logic, you must allocate a completely new block when the split is impossible.
+
+The instructions state that if the function "does not succeed in freeing the blocks in the suitable way" (i.e., it cannot split the block due to the size constraints mentioned above), it must trigger the fallback mechanism:
+
+Allocate a new block of the requested size.
+
+Copy the data from the old block to the new one (truncated to size).
+
+Free the entire old block.
+
+3. Why allocate a new block instead of keeping the old one?
+It might seem inefficient to move data just to shrink it, but there is a logic to this requirement regarding fragmentation:
+
+Reclaiming the Large Block: If you kept the original large block but only used a small part of it (because you couldn't split it), that wasted space is "trapped" inside the allocation (Internal Fragmentation). By moving the data to a new, smaller block that fits it tightly (Best Fit), you can free the entire original large block.
+
+Future Use: That original large block is now available in the free list to satisfy a future request for a large allocation, rather than being tied up holding a small amount of data.
+
+Summary Table
+Scenario	Condition	Action
+Successful Split	Remainder is large enough for metadata + alignment.	Shrink in place. Create a new free block from the remainder.
+Failed Split	Remainder is too small (e.g., < header size).	
+
+Allocate new block, copy data, and free the entire old block.
+
+Next Step: Would you like to review how to implement the split_block helper function to check these size and alignment constraints?
+
+ok pls read the whole excercise carfully because i want to discuss an idea of a linked list only of the allocated blocks, free blocks merging is easiest that way and i see no major disadvantages aside from needing this list to be sorted by adress so that allocating will be a little slower, what do you think?
+
+This is a creative and valid approach that simplifies the "merging" logic significantly. However, you should be aware of a specific performance trade-off and a few implementation details required to make it work with the assignment constraints.
+
+Here is an analysis of your idea (Linked List of Allocated Blocks Only) vs. the standard approach (Linked List of All Blocks).
+
+1. Does it fit the requirements?
+Yes.
+
+
+The List: The assignment explicitly states: "The program will hold a linked list of blocks that have been allocated". It does not explicitly mandate a separate list for free blocks, so your approach is textually compliant.
+
+Merging: You are correct that merging becomes "implicit." The assignment asks to merge adjacent free blocks. In your model, removing a node from the sorted list essentially "merges" the gap before it and the gap after it into one larger gap. This satisfies the requirement functionally without needing complex merge logic.
+
+2. The Advantages (Why your idea is good)
+Automatic Merging: You eliminate the edge cases of checking "is my left neighbor free? is my right neighbor free?" inside free(). You simply remove the node, and the free space naturally becomes contiguous.
+
+Simpler Metadata: You don't need to maintain headers/metadata inside the free memory itself. You only need headers for the allocated blocks.
+
+Realloc is Easier: To check if you can expand a block in place, you simply look at the address of the next node in your list. If next_node_addr - current_node_end > requested_expansion, you have space.
+
+3. The Disadvantages (The "Gotchas")
+While "allocation will be a little slower" is true, there are specific reasons why that might be tricky for "Best Fit":
+
+
+Best Fit Performance: The assignment requires Best Fit.
+
+Standard Way (Free List): You iterate only the free blocks. As memory fills up, the free list gets shorter, making the search faster.
+
+Your Way (Allocated List): You must iterate the allocated blocks to calculate the "gaps" between them. As memory fills up, your list gets longer. In a heavy-load scenario, finding a free slot becomes an 
+O(N)
+ operation where 
+N
+ is the number of allocations, which is much slower than 
+O(F)
+ (number of free spots).
+
+Gap Calculation Overhead: You cannot just read a "size" field to see if a block fits. You must constantly calculate:
+
+Gap=(NextBlock.Address)−(CurrentBlock.Address+CurrentBlock.Size)
+Edge Case - The Heap Boundaries: You effectively have two "invisible" gaps you must always calculate manually:
+
+The gap between the start of the heap and the first node.
+
+The gap between the last node and the Program Break (sbrk(0)).
+
+4. Implementation Advice
+If you proceed with this (which is a solid choice for code simplicity), keep these tips in mind:
+
+Sorted Insert is Mandatory: As you noted, the list must be sorted by address. When you malloc, you will scan the gaps. Once you find the "Best Fit" gap, you insert the new node into the list at that exact spot to maintain order.
+
+
+Releasing Memory: The assignment requires you to lower the program break if the free block is at the end of memory.
+
+In your model, this is easy: Check the tail of your list.
+
+If tail->address + tail->size < sbrk(0), then the space after the tail is free. You can call sbrk with a negative offset to release it.
+
+The "First" Gap: Don't forget that if your list starts at address 0x200 but the heap starts at 0x100, you have a valid free block of size 100 at the start. Your loop needs to handle this "pre-head" gap.
+
+Verdict: This is a valid architecture that trades runtime performance (slower allocations when memory is full) for implementation simplicity (easy free/merge logic). Given this is a school assignment where code correctness and simplicity often outweigh raw optimization, it is a very strong strategy.
+
+Next Step: Would you like to discuss how to implement the Best Fit search loop using this "gap calculation" method?
+
+how many bytes is size_t
+
+In the context of your assignment, the size of size_t depends on the architecture of the system the course uses for testing, but here are the key technical details and requirements mentioned in your instructions:
+
+The Size of size_t
+On 64-bit systems: size_t is typically 8 bytes (64 bits).
+
+On 32-bit systems: size_t is typically 4 bytes (32 bits).
+
+Since the Technion's servers typically run on 64-bit Linux architectures for Operating Systems courses, you should generally expect it to be 8 bytes.
+
+Assignment Requirements for Data Types
+The instructions provide specific rules regarding how you handle sizes and types:
+
+
+Mandatory Type: You must ensure that all memory sizes in the exercise are represented by the size_t type.
+
+
+Prohibited Types: You are explicitly told to use size_t instead of int or unsigned long for representing sizes.
+
+
+Alignment Requirement: Regardless of the size of size_t, all memory allocations must be a multiple of 4 bytes.
+
+For example, if a user requests 5 bytes, you must allocate 8 bytes.
+
+You are provided with a macro, ALIGN_TO_MULT_OF_4(x), to handle this rounding logic.
+
+Why size_t Matters for your Linked List
+Since you are planning to use a linked list of allocated blocks, the size of size_t will impact the "overhead" (metadata) of each node in your list:
+
+Component	Size (approx. on 64-bit)
+void* next (pointer)	8 bytes
+size_t size	8 bytes
+Total Header per block	~16 bytes
+Keep in mind that when you calculate the "gaps" between your allocated blocks, you must perform the pointer arithmetic carefully. Since size_t is an unsigned type, subtracting a larger address from a smaller one will cause an overflow rather than a negative number.
+
+Would you like me to help you define the struct for your allocated list nodes using size_t and the alignment macro?
+
+remind me about static variables inside functions pls
+
+In the context of your systems programming assignment, static variables inside functions serve a very specific purpose for managing your memory allocator's state.
+
+What is a Static Local Variable?
+A variable declared with the static keyword inside a function is initialized only once—the first time the function is called. Unlike regular local variables (automatic variables) which are stored on the stack and destroyed when the function returns, static variables are stored in the Data Segment (specifically the .data or .bss sections).
+
+They persist for the entire lifetime of the program, meaning they "remember" their value between different calls to the same function.
+
+Why Use Them in Your Allocator?
+The assignment suggests using static objects to ensure they are allocated at the start of the program and remain available throughout its execution. In your specific case of a Linked List of Allocated Blocks, a static variable is the perfect way to store the "Head" of your list.
+
+For example, inside customMalloc:
+
+C++
+void* customMalloc(size_t size) {
+    static Node* head = NULL; // Initialized ONLY on the first call
+    // 'head' will keep its value even after customMalloc returns.
+}
+Key Differences for Your Project
+Feature	Regular Local Variable	Static Local Variable
+Location	
+
+Stack (grows downwards) 
+
+
+Initialized/Uninitialized Data 
+
+Lifetime	Exits with the function scope.	
+Lasts until the process terminates.
+
+Initialization	Every time the function is called.	Exactly once (usually at program start).
+Usage	Temporary calculations.	Global-like state (e.g., the List Head).
+Important Note for "Part B" (Multithreading)
+While static variables are great for persistent state, they are not thread-safe by default. Since your customMTMalloc will involve 8 different memory regions, each with its own lock, you will need to be careful how you manage these static headers. The instructions mention that for Part B, you cannot use __thread (Thread Local Storage), so your static variables will be shared across all threads and must be protected by the locks you implement.
+
+Next Step: Would you like to see how to define your Node struct and the static head pointer to start building your sorted list?
+
+void addHeaderToList(Header* newHeader){
+
+    if(headerList == NULL){
+
+        headerList = newHeader;
+
+        newHeader->prev = NULL;
+
+        newHeader->next = NULL;
+
+    } else {
+
+        Header* current = headerList;
+
+        //insert so that the list is sorted by address
+
+        while(current != NULL && current < newHeader){
+
+            if(current->next == NULL){
+
+                //insert at end
+
+                current->next = newHeader;
+
+                newHeader->prev = current;
+
+                newHeader->next = NULL;
+
+                return;
+
+            }
+
+            current = current->next;
+
+        }
+
+        //insert before current
+
+        if(current != NULL){
+
+            newHeader->next = current;
+
+            newHeader->prev = current->prev;
+
+            if(current->prev != NULL){
+
+                current->prev->next = newHeader;
+
+            } else {
+
+                headerList = newHeader;
+
+            }
+
+            current->prev = newHeader;
+
+        }
+
+    }
+
+}
+
+
+
+we want the header list to be sorted upwards by address, is it ok?
+
+Yes, this code is correct for maintaining a linked list sorted by memory address (ascending). The logic soundly handles the three main scenarios: inserting at the head, in the middle, and at the tail.
+
+Here is a quick verification of why it works:
+
+1. Verification of Cases
+Case A: Insertion at the Head (e.g., List is 0x200, inserting 0x100)
+
+The while loop condition current < newHeader fails immediately because 0x200 > 0x100.
+
+The code skips to //insert before current.
+
+It updates pointers to place newHeader before current and correctly updates headerList to point to the new head.
+
+Case B: Insertion in the Middle (e.g., List is 0x100 -> 0x300, inserting 0x200)
+
+The loop starts at 0x100. The condition 0x100 < 0x200 is true.
+
+It advances current to 0x300.
+
+The loop checks 0x300 < 0x200. This is false, so the loop terminates.
+
+The code inserts newHeader before current (0x300), sandwiching it correctly between 0x100 and 0x300.
+
+Case C: Insertion at the Tail (e.g., List is 0x100, inserting 0x200)
+
+The loop starts at 0x100. The condition 0x100 < 0x200 is true.
+
+Inside the loop, it checks if(current->next == NULL). This is true.
+
+It appends newHeader to the end, links the pointers, and returns immediately. This avoids the complexity of the "insert before" logic for the tail case.
+
+2. Important Note on Scope
+Since you are using headerList inside the function, ensure that headerList is accessible as a global variable or a static variable.
+
+If headerList were just a local variable passed into the function as a parameter (e.g., void addHeaderToList(Header* headerList, Header* newHeader)), the line headerList = newHeader would only update the local copy, and the actual list head in your main program would not change.
+
+Since your previous questions mentioned using static variables, your setup likely looks like this, which is correct:
+
+C
+// Defined outside the function or as a static inside the file
+static Header* headerList = NULL; 
+
+void addHeaderToList(Header* newHeader) {
+    // Your code here uses the static 'headerList'
+}
+3. Minor Optimization
+The check if(current != NULL) after the while loop is technically redundant (but harmless safety code).
+
+If the list was traversed to the end, the function returns inside the loop (if(current->next == NULL) ... return;).
+
+Therefore, if execution reaches the code after the loop, current is guaranteed to be pointing to a valid node (the one we need to insert before).
+
+Next Step: Would you like to check the logic for finding the "Best Fit" gap using this sorted list?
+
+is the heap end always the same address, if not how may i find out mid run
+
+The answer depends on whether you mean the top of the heap (where new memory grows) or the bottom (where the heap started).
+
+1. The Top of the Heap (The "Program Break")
+Is it fixed? No. The "end" of the heap is dynamic. In Linux, this boundary is called the Program Break. It moves up (to higher addresses) when you need more memory and can move down if you release memory at the end of the heap.
+
+How to find it mid-run? You use the system call sbrk(0).
+
+Calling sbrk(0) returns the current address of the Program Break without changing it.
+
+Usage in your "Allocated List" approach: You will need this to calculate the potential "gap" after your very last allocated block.
+
+Gap_at_End = sbrk(0) - (Last_Block_Address + Last_Block_Size)
+
+2. The Bottom of the Heap (The Start)
+Is it fixed? Yes. Once your program starts allocating memory, the "start" of the heap remains constant.
+
+How to find it mid-run? The system does not give you a direct function to "ask" for the initial start address later on. You must remember it yourself.
+
+Implementation Tip: Use a static variable that initializes only once, effectively saving the start address during your very first malloc call (or heapCreate if you use it).
+
+C
+void* customMalloc(size_t size) {
+    static void* heapStart = NULL;
+    if (heapStart == NULL) {
+        heapStart = sbrk(0); // Saves the initial program break as the "start"
+    }
+    // ... rest of logic
+}
+Summary for your Linked List Logic
+To calculate the gap before the first block, you need that saved heapStart. To calculate the gap after the last block, you need to call sbrk(0).
+
+if we want to do it in heapstart should we declare it as an exetrn on the h file first?
+
+You generally should not declare it as extern in the header file (.h) unless you are splitting your code across multiple .c files (which is tricky given the submission instructions).
+
+Since you are required to submit only customAllocator.h and customAllocator.c (or .cpp), the standard and safest approach is to declare it as a static global variable at the top of your .c file.
+
+Why not extern in the .h file?
+Encapsulation: The heapStart address is an internal implementation detail of your allocator. The user of your library (the main function) does not need to know about it.
+
+Submission Safety: Modifying the header file to include global variables can sometimes cause conflicts if the tester's main.c defines variables with similar names. It's safer to keep your internal state hidden inside your implementation file.
+
+The Recommended Approach: Static Global in .c
+Declare it at the very top of your customAllocator.c file, outside of any function. This makes it visible to all your functions (malloc, free, realloc) but hides it from the rest of the program.
+
+Here is how your customAllocator.c should look:
+
+C
+// customAllocator.c
+
+#include "customAllocator.h"
+#include <unistd.h> // for sbrk
+
+// 1. Declare it here. "static" means it's only visible in this file.
+static void* heapStart = NULL; 
+static Header* headerList = NULL; // Your sorted list head
+
+void* customMalloc(size_t size) {
+    // 2. Initialize it on the very first call
+    if (heapStart == NULL) {
+        heapStart = sbrk(0);
+    }
+
+    // ... your allocation logic ...
+}
+
+// Now you can use 'heapStart' inside free(), realloc(), etc.
+When would you use extern?
+You would only use extern if you wrote a separate file called linkedList.c that needed to access heapStart defined in customAllocator.c. However, since you can only submit one source file, you will likely keep all your helper functions and logic inside customAllocator.c anyway, making the static global approach perfect.
+
+Next Step: Would you like to walk through the calculation for the "First Gap" (between heapStart and headerList) now that you have the variable set up?
+
+we want to calculate gap between following blocks but not sure abut the casting:
+
+        return sbrk(0) - (void*)((char*)header + sizeof(Header) + header->size);
+
+Your logic for calculating the address of the "end of the block" is correct, but the subtraction casting is risky.
+
+In standard C, arithmetic on void* pointers (like sbrk(0) - void*) is undefined. While GCC (the compiler used in Linux) allows it by treating void as having size 1, it is safer and more portable to perform subtraction using char* or size_t.
+
+The Fix
+You should cast sbrk(0) to char* and remove the cast to (void*) on the right side.
+
+Recommended Code:
+
+C
+// Cast sbrk(0) to char* so subtraction works in bytes
+return (char*)sbrk(0) - ((char*)header + sizeof(Header) + header->size);
+Why this is better?
+(char*)header + ...: This correctly moves the pointer by bytes.
+
+(char*)sbrk(0): This tells the compiler "treat the program break address as a byte pointer."
+
+Subtraction: When you subtract two char* pointers, the result is the number of bytes between them (returned as ptrdiff_t or convertible to size_t).
+
+A Critical Check: header->size
+Does your header->size store the user's requested size (e.g., 5 bytes) or the aligned block size (e.g., 8 bytes)?
+
+If it stores the aligned size: Your formula is perfect.
+
+If it stores the requested size: You need to align it in the calculation, or you will think the block ends earlier than it actually does.
+
+Correction if needed: ... + ALIGN_TO_MULT_OF_4(header->size))
+
+Next Step: Since this calculates the "Last Gap," would you like to verify the loop condition for finding gaps between allocated blocks in your sorted list?
+
+at the end im looking to retun a size_t, why not cast everything to size_t?
+
+You absolutely can, and in many ways, it is cleaner and safer for this specific type of "address math."
+
+Since you are treating memory addresses essentially as "numbers on a timeline" to find the distance between them, casting everything to size_t (or uintptr_t) before subtracting is a very standard systems programming technique.
+
+Why casting to size_t is a good idea here:
+Simplicity: You stop worrying about pointer types (void* vs char*) and just do simple integer subtraction: End - Start = Size.
+
+Matches Return Type: You need to return a size_t anyway, so working in that type from the start avoids implicit casting later.
+
+The Correct Syntax
+Here is how that line would look using your approach:
+
+C
+size_t programBreak = (size_t)sbrk(0);
+size_t blockEnd = (size_t)header + sizeof(Header) + header->size;
+
+return programBreak - blockEnd;
+The One "Danger" to Watch Out For
+The only downside to using size_t (which is unsigned) instead of pointer arithmetic (which usually results in a signed ptrdiff_t) is underflow.
+
+Scenario: If you have a bug and blockEnd is actually larger than programBreak (e.g., your list is corrupted).
+
+Pointer Math: Result would be negative (easier to spot in debugging).
+
+size_t Math: Result wraps around to a massive positive number (e.g., 18446744073709551600).
+
+Recommendation: Since this is an allocator and valid logic guarantees blockEnd <= sbrk(0), casting to size_t is perfectly fine. Just trust your logic!
+
+Next Step: You have the logic for the First Gap (Start to First Head) and the Last Gap (Last Head to End). Would you like to check the loop that calculates the gaps between two nodes in the middle?
+
+can we do sbrk(negative value)
+
+Yes, you absolutely can call sbrk with a negative value, and you must do so to fulfill the requirements of this assignment.
+
+1. What it Does
+Calling sbrk with a negative increment moves the Program Break (the top of the heap) downward toward lower addresses. This effectively releases that memory back to the operating system.
+
+2. When to use it in your code
+The assignment specifically requires this in the customFree function:
+
+
+The Rule: "If it is possible to release memory to the operating system (meaning the block is at the edge of the memory space), this must be performed as part of the free function".
+
+
+The Implementation: In your sorted list approach, if you free a block and it was the last node in your list, you should calculate how much space is now empty between the new last node and the current sbrk(0). You then call sbrk(-size_to_release) to shrink the heap.
+
+3. Critical Requirements for Shrinking
+Checking Success: Just like with positive values, you should check the return value of sbrk. If it fails, it returns (void*)-1.
+
+
+Memory Alignment: Remember that the assignment requires all allocations to be multiples of 4 bytes. When shrinking the heap, ensure your negative increment also maintains the 4-byte alignment of the remaining Program Break to avoid confusing your allocator logic later.
+
+
+Full Release: You are instructed to release the "maximum possible memory". If your headerList becomes completely empty after a free, you can theoretically move the Program Break all the way back to your saved heapStart.
+
+4. Implementation Logic
+In your customFree(void* ptr):
+
+Remove the header from your headerList.
+
+Check if the list is now empty or if the space after the new tail is significant.
+
+Calculate size_to_release = (size_t)sbrk(0) - (size_t)new_limit.
+
+Call sbrk(-(intptr_t)size_to_release).
+
+Next Step: Would you like to see how to calculate the new_limit safely when your list has a "new" tail after a deletion?
+
+we have an important hypotetical, lets say only 4 bytes on the heap are allocated (adrresses 0,1,2,3) will pb point on adrees 3 or address 4?
+
+Based on standard Linux memory management (which this assignment emulates), the Program Break would point to Address 4.
+
+Here is the breakdown of why:
+
+1. The Definition of Program Break
+The Program Break (PB) does not point to the last valid byte; it points to the first invalid byte immediately after the heap. It acts as the boundary or limit of your allocated data segment.
+
+Allocated Bytes: 0, 1, 2, 3 (These belong to you).
+
+Program Break: 4 (This is the "wall" or the start of unmapped memory).
+
+2. The Calculation
+If your heap starts at 0 and you call sbrk(4) to allocate 4 bytes:
+
+Old PB(0)+Increment(4)=New PB(4)
+The math works exactly like array sizing in C:
+
+If you have char arr[4], the valid indices are 0, 1, 2, 3.
+
+The "size" is 4.
+
+The Program Break is effectively the "size" pointer relative to the start.
+
+Why this matters for your assignment
+When you calculate "gaps" or "remaining space" using sbrk(0), you can trust standard subtraction:
+
+sbrk(0) - last_byte_address = 1 (logic error)
+
+sbrk(0) - (last_byte_address + 1) = 0 (Correct: 0 bytes free).
+
+This fits your previous formula perfectly: (char*)sbrk(0) - ((char*)header + sizeof(Header) + header->size). The header->size moves the pointer past the last valid byte, exactly to where sbrk(0) sits (Address 4).
+
+Next Step: Would you like to review the specific if condition to decide when to call sbrk versus when to use an existing gap?
+
+is the sbrk logic here good?
+
+
+
+void* endOfBlock(Header* header){
+
+    return (void*)((size_t)header + sizeof(Header) + header->size);
+
+}
+
+
+
+void customFree(void* ptr){
+
+    if(ptr == NULL){
+
+        return;
+
+    }
+
+    if((size_t)ptr < (size_t)heapStart || (size_t)ptr >= (size_t)sbrk(0)){
+
+        perror("<free error>: passed non-heap pointer");
+
+        return;
+
+    }
+
+    Header* headerToFree = (Header*)((size_t)ptr - sizeof(Header));
+
+    removeHeaderFromList(headerToFree);
+
+    if(endOfBlock(headerToFree) == sbrk(0)){ // TODO: check if its sbrk(0) - 1 or + 1
+
+        int err = brk(headerToFree); //TODO: check if its brk() - 1 or + 1
+
+        if(err != 0){//TODO check errno
+
+        }
+
+    }
+
+}
+
+This logic is conceptually correct and the pointer math is precise. You do not need any +1 or -1 adjustments.
+
+Here is the review of your specific points and the TODOs:
+
+1. The Math Verification
+endOfBlock: Perfect.
+
+Your calculation (size_t)header + sizeof(Header) + header->size points exactly to the first byte after the block.
+
+Since sbrk(0) also points to the first byte after the valid heap, comparing them directly is correct.
+
+brk(headerToFree): Perfect.
+
+Calling brk with the start address of the block effectively cuts the heap off right at that point, releasing the block's header and data back to the OS.
+
+2. Addressing Your TODOs
+// TODO: check if its sbrk(0) - 1 or + 1
+
+Answer: Neither. Use exact equality == sbrk(0).
+
+Reason: As discussed, sbrk(0) is the boundary. If your block fills the space exactly up to the boundary, their addresses are identical.
+
+// TODO: check if its brk() - 1 or + 1
+
+Answer: Neither. Pass headerToFree exactly.
+
+// TODO check errno
+
+Answer: brk returns -1 on failure. You usually don't need to check errno extensively here unless you want to debug why it failed. The assignment just says "if it works, do it".
+
+3. Critical Improvements
+While the logic is "correct" for a basic case, here are two adjustments to make it robust and compliant with the "Allocated List" design:
+
+A. The "Check Tail" Optimization (Recommended) Your current code only shrinks the heap if the specific block being freed is at the top.
+
+Scenario: What if you free the last block, but there was already a tiny "gap" of unused memory after it (due to some alignment quirk)? Your == sbrk(0) check would fail, and you wouldn't release anything.
+
+Better Logic: After calling removeHeaderFromList, look at the new last node in your list.
+
+C
+removeHeaderFromList(headerToFree);
+
+// Find the new end of the used memory
+void* newHeapLimit;
+if (headerList == NULL) {
+    newHeapLimit = heapStart; // List is empty, reset to start
+} else {
+    // Assuming your list is sorted, find the last node
+    Header* last = getLastNode(headerList); 
+    newHeapLimit = endOfBlock(last);
+}
+
+// Shrink the heap to the new limit
+if ((size_t)sbrk(0) > (size_t)newHeapLimit) {
+    if (brk(newHeapLimit) == -1) {
+        // Handle error if needed
+    }
+}
+This guarantees you always release the "maximum possible memory", regardless of which block was freed.
+
+B. Output Formatting
+
+Issue: perror prints the system error message (like "Success" or "Invalid Argument") after your string.
+
+Fix: The assignment likely expects the exact string output for auto-testing. Use printf or fprintf instead.
+
+C
+// instead of perror("<free error>: passed non-heap pointer");
+printf("<free error>: passed non-heap pointer\n"); 
+return;
+(Note: Check if the assignment wants a newline \n or not).
+
+Final "Green Light" Code Snippet
+If you want to stick to your specific logic (without the "Check Tail" optimization), here is the cleaned-up version:
+
+C
+void customFree(void* ptr) {
+    if (ptr == NULL) {
+        printf("<free error>: passed null pointer\n"); // [cite: 88]
+        return;
+    }
+    
+    // Check bounds strictly
+    if ((size_t)ptr < (size_t)heapStart || (size_t)ptr >= (size_t)sbrk(0)) {
+        printf("<free error>: passed non-heap pointer\n"); // [cite: 90]
+        return;
+    }
+
+    Header* headerToFree = (Header*)((char*)ptr - sizeof(Header));
+    
+    // Important: remove from list BEFORE releasing memory
+    removeHeaderFromList(headerToFree); 
+
+    if (endOfBlock(headerToFree) == sbrk(0)) {
+        if (brk(headerToFree) == -1) {
+             // Optional: handle failure
+        }
+    }
+}
+in the instructions it says:
+
+
+
+can we just set brk(heap_start) or should we use our costum fre to eachblock individually, because it doesnt do reall anything special
+
+Based on the instructions and standard systems programming practices, you should use brk(heapStart) directly.
+
+Here is why this is the better approach compared to calling customFree in a loop:
+
+1. The Goal is "OS Release," not "List Cleanup"
+The instruction "release all memory" in the context of a fatal error (Out Of Memory) means giving the physical pages back to the operating system.
+
+customFree: Designed to maintain your linked list structure. It only releases memory to the OS if the block happens to be at the very end of the heap. If you free a block in the middle, customFree keeps that space mapped but marks it as "free" in your logic. This does not satisfy the requirement to "release all memory" back to the system.
+
+brk(heapStart): This creates a "hard reset." It tells the OS, "I am done with everything from start to finish." This guarantees that 100% of the heap is unmapped, which is exactly what the instructions demand before exiting.
+
+2. Safety in an Error State
+When sbrk fails, your program is in a fragile state. Relying on your own logic (traversing a list, updating pointers) is risky.
+
+By calling brk(heapStart), you bypass all your own logic and use the kernel to wipe the slate clean.
+
+Since the very next instruction is exit(1), you don't need to worry about your linked list being "corrupted" or invalid. The program is dead anyway.
+
+Recommended Implementation
+Since you saved heapStart in a static variable (as discussed previously), your error handler should look like this:
+
+C
+// In your error handling block
+if (sbrk_failed) {
+    // 1. Release ALL memory to the OS instantly
+    brk(heapStart); 
+    
+    // 2. Print the required error message
+    printf("<sbrk/brk error>: out of memory\n"); [cite_start]// [cite: 114]
+    
+    // 3. Exit with status 1
+    exit(1); [cite_start]// [cite: 113]
+}
+what do you think shoul we do in case of an error which is not out of mem, the program will still have unexpected behavior frm tat point on
+
+This is an excellent systems programming question. You are correct to be concerned about "unexpected behavior," but in the context of malloc, the "unexpected behavior" usually belongs to the user of your function, not the allocator itself—provided you implement it carefully.
+
+Here is the breakdown of how to handle non-OOM errors based on the assignment text and standard conventions.
+
+1. The Assignment's Distinction
+The instructions explicitly tell you to distinguish between two failure modes:
+
+Out of Memory: "The system ran out of memory."
+
+Incorrect Call: "The call to them was incorrect (e.g., with problematic parameters)."
+
+For Case 1 (OOM), the instructions are strict: free everything, print the specific error, and exit(1).
+
+For Case 2 (Incorrect Call/Other), the instructions do not mandate an exit. This implies you should follow the standard C library behavior: Return NULL.
+
+2. Why NULL is the Safe Answer
+If sbrk fails because of a logic error (e.g., bad alignment or a weird pointer calculation) or a system limit that isn't strict OOM:
+
+Do not exit: Exiting the entire program because of an allocation failure (that isn't strictly OOM) is considered "rude" for a library function. The calling program might have its own fallback logic (e.g., "If malloc fails, I'll try to free some cache and try again").
+
+Do return NULL: This signals to the user "I could not give you this memory."
+
+3. Preventing "Unexpected Behavior" (Corruption)
+Your fear is that the program will continue in an unstable state. You prevent this by ordering your operations correctly.
+
+The Golden Rule: Do not touch your global headerList until you are 100% sure the memory is yours.
+
+Correct Flow:
+
+Check for gaps in the list.
+
+If no gap, calculate needed size.
+
+Call sbrk (The "Danger" Step).
+
+CHECK RETURN VALUE:
+
+If sbrk fails: check errno.
+
+If ENOMEM: Jump to the "Release All and Exit" routine.
+
+If other: Just return NULL. Do not add anything to the list.
+
+Only if sbrk succeeded: Add the new node to your headerList.
+
+By following this order, if sbrk fails (for any reason), your linked list remains exactly as it was before the call. The state is consistent, and the program can safely continue (or crash gracefully in the user's code because they received NULL).
+
+4. Implementation Snippet
+Here is how that logic looks in code:
+
+C
+void* request = sbrk(increment);
+
+if (request == (void*)-1) {
+    if (errno == ENOMEM) {
+        // Strict Assignment Requirement
+        brk(heapStart); 
+        printf("<sbrk/brk error>: out of memory\n"); // [cite: 114]
+        exit(1); // 
+    } else {
+        // Non-OOM failure (e.g., weird parameters or limit reached)
+        // Just return NULL. The list is untouched, so state is safe.
+        return NULL; 
+    }
+}
+
+// Only reach here if memory is valid. NOW we can safely update the list.
+addHeaderToList(newHeader);
+Next Step: Would you like to check exactly which errno headers you need to include to check for ENOMEM?
+
+where in te memory space will a global static be allocated?
+
+Based on the memory layout diagram provided in your assignment instructions, a global static variable is allocated in the Data Segment, which is located below the Heap.
+
+Specific location depends on initialization:
+
+
+Initialized Data: If you declare it with a value (e.g., static void* heapStart = (void*)0x1234;), it goes into the Initialized data section.
+
+
+BSS: If you declare it without a value (e.g., static void* heapStart; or static void* heapStart = NULL;), it goes into the Uninitialized data (bss) section.
+
+Why this matters for your Allocator
+Looking at the memory map from your PDF, the layout is:
+
+Text (Code)
+
+Initialized Data & BSS (Where your static variables live)
+
+Heap (Where your sbrk allocations happen)
+
+Because the Data Segment is at a lower address than the Heap, your static variables are perfectly safe. When you move the Program Break up or down with sbrk, you are modifying the space above your static variables, so your list head and heapStart pointers will never be overwritten by your own allocation logic.
+
+Next Step: You mentioned using headerList as your static head. Would you like to check if your addHeaderToList function properly handles the case where headerList is NULL (the BSS default state)?
+
+is that allowed?
+
+#define REGION_SIZE (1 << 12) + sizeof(Header) + sizeof(pthread_mutex_t) //4KB + header size + mutex size
+
+Yes, this logic is allowed and actually highly recommended given the constraints of Part B (Multithreaded Malloc).
+
+Here is the breakdown of why this is a good idea, along with a critical syntax fix you must apply.
+
+1. Why this is smart (Logic check)
+The assignment states two conflicting constraints:
+
+You must prepare memory regions of 4KB each.
+
+You can assume no single request will be larger than 4KB.
+
+If you allocated exactly 4096 bytes (4KB) for the region and stored your pthread_mutex_t and Header inside it, your effective usable memory would be, for example, 4050 bytes.
+
+If a user then requests exactly 4KB (4096 bytes), your allocator would fail because it only has 4050 bytes available.
+
+By adding the overhead to your allocation size (4KB + Overhead), you guarantee that the payload capacity is a full 4KB, satisfying the requirement to handle 4KB requests.
+
+2. Critical Syntax Warning
+Your macro has a C preprocessor danger known as the Operator Precedence Bug.
+
+Current: #define REGION_SIZE (1 << 12) + sizeof(Header) + sizeof(pthread_mutex_t)
+
+The Bug: If you use this in math, like REGION_SIZE * 2, it expands to: (1 << 12) + sizeof(Header) + sizeof(pthread_mutex_t) * 2 Only the last term gets multiplied!
+
+The Fix: You MUST wrap the entire expression in parentheses.
+
+C
+// CORRECT VERSION
+#define REGION_SIZE ((1 << 12) + sizeof(Header) + sizeof(pthread_mutex_t))
+3. Alignment Check
+Just ensure that your sizeof(Header) and sizeof(pthread_mutex_t) sum up to a multiple of 4. The assignment requires all allocations to be 4-byte aligned.
+
+1 << 12 (4096) is already aligned.
+
+If Header + mutex is not a multiple of 4, your region will start at an aligned address, but the usable memory inside (after the metadata) might start at an unaligned address.
+
+Tip: You can wrap the whole sum in your ALIGN_TO_MULT_OF_4 macro to be safe.
+
+ok, before really diving into part B, do you find any problems in part A implementation?
+
+
+
+#include "customAllocator.h"
+
+
+
+
+
+static void* heapStart = NULL;
+
+static Header* headerList = NULL; // Your sorted list head
+
+
+
+/*=============================================================================
+
+helper functions
+
+=============================================================================*/
+
+void heapCreate(){
+
+    heapStart = sbrk(0);
+
+}
+
+void heapKill(){
+
+}
+
+
+
+void addHeaderToList(Header* newHeader, Header* predecessorHeader){
+
+    if(headerList == NULL){
+
+        headerList = newHeader;
+
+        newHeader->prev = NULL;
+
+        newHeader->next = NULL;
+
+    } else if(predecessorHeader == NULL){
+
+        //we add to the beginning of the list
+
+        newHeader->next = headerList;
+
+        newHeader->prev = NULL;
+
+        headerList->prev = newHeader;
+
+        headerList = newHeader;
+
+    } else {
+
+        //we get a predecessor header
+
+        newHeader->next = predecessorHeader->next;
+
+        newHeader->prev = predecessorHeader;
+
+        predecessorHeader->next = newHeader;
+
+        if(newHeader->next != NULL){
+
+            newHeader->next->prev = newHeader;
+
+        }
+
+    }
+
+}
+
+
+
+void removeHeaderFromList(Header* header){
+
+    if(header->prev != NULL){
+
+        header->prev->next = header->next;
+
+    } else {
+
+        headerList = header->next;
+
+    }
+
+    if(header->next != NULL){
+
+        header->next->prev = header->prev;
+
+    }
+
+}
+
+
+
+//recives size includng the header size
+
+bool findBestFit(size_t neededSize, Header** predecessortoBestFit){
+
+
+
+    //first find the gap between heapStart and first header
+
+    size_t bestFitSize = (size_t)(-1);
+
+    size_t gap_size = 0;
+
+    if(headerList == NULL){
+
+        gap_size = (size_t)sbrk(0) - (size_t)heapStart;
+
+        if(gap_size >= neededSize){
+
+            *predecessortoBestFit = NULL;
+
+            return true;
+
+        } else {
+
+            return false;
+
+        }
+
+    }
+
+    Header* current = headerList;
+
+    while(current != NULL){
+
+        gap_size = followingFreeBlockSize(current);
+
+        if(gap_size >= neededSize && gap_size < bestFitSize){
+
+            bestFitSize = gap_size;
+
+            *predecessortoBestFit = current;
+
+        }
+
+        current = current->next;
+
+    }
+
+    if(bestFitSize != (size_t)(-1)){
+
+        return true;
+
+    } else {
+
+        return false;
+
+    }
+
+
+
+};
+
+
+
+size_t followingFreeBlockSize(Header* header){
+
+    if(header == NULL ){
+
+        return 0;
+
+    }
+
+    size_t blockEnd = (size_t)endOfBlock(header);
+
+    if(header->next == NULL){
+
+        size_t programBreak = (size_t)sbrk(0);
+
+        return programBreak - blockEnd;
+
+    }
+
+    return ((size_t)header->next - blockEnd);
+
+}
+
+
+
+void* endOfBlock(Header* header){
+
+    return (void*)((size_t)header + sizeof(Header) + header->size);
+
+}
+
+
+
+void outOfMemHandler(){
+
+    brk(heapStart); //reset brk to initial state
+
+    printf("<sbrk/brk error>: out of memory\n");
+
+    exit(1);
+
+}
+
+
+
+
+
+
+
+
+
+/*=============================================================================
+
+PART A
+
+=============================================================================*/
+
+
+
+void* customMalloc(size_t size){
+
+    if(size == 0){
+
+        return NULL;
+
+    }
+
+
+
+    size_t neededSize = size + sizeof(Header);
+
+    Header* predecessorHeader = NULL;
+
+    void* startHeader = NULL;
+
+    bool found_free_block = findBestFit(neededSize, &predecessorHeader);
+
+    if(!found_free_block){
+
+        //no free block, raise program break
+
+        startHeader = sbrk(neededSize);
+
+        if(startHeader == SBRK_FAIL){
+
+            if(errno == ENOMEM){
+
+                outOfMemHandler();
+
+            } else {
+
+                printf("<sbrk error>: bad sbrk args\n");
+
+                return NULL;
+
+            }
+
+        }
+
+    }
+
+    else {
+
+        //found free block
+
+        if(predecessorHeader == NULL){
+
+            //free block is at the beginning of the heap
+
+            startHeader = heapStart;
+
+        } else {
+
+            //free block is after predecessorHeader
+
+            startHeader = endOfBlock(predecessorHeader);
+
+        }
+
+    }
+
+
+
+    Header* allocatedHeader = (Header*)startHeader;
+
+    //set header info
+
+    allocatedHeader->size = size;
+
+    //add to header list
+
+    addHeaderToList(allocatedHeader, predecessorHeader);
+
+    //return pointer to memory after header
+
+    return (void*)((size_t)allocatedHeader + sizeof(Header));
+
+}
+
+
+
+void customFree(void* ptr){
+
+    if(ptr == NULL){
+
+        return;
+
+    }
+
+    if((size_t)ptr < (size_t)heapStart || (size_t)ptr >= (size_t)sbrk(0)){
+
+        printf("<free error>: passed non-heap pointer\n");
+
+        return;
+
+    }
+
+    Header* headerToFree = (Header*)((size_t)ptr - sizeof(Header));
+
+    removeHeaderFromList(headerToFree);
+
+    if(endOfBlock(headerToFree) == sbrk(0)){
+
+        int err = brk(headerToFree); 
+
+        if(err == BRK_FAIL){
+
+            if(errno == ENOMEM){
+
+                outOfMemHandler();
+
+            } else {
+
+                printf("<brk error>: bad brk args\n");
+
+            }
+
+            return;
+
+        }
+
+    }
+
+}
+
+
+
+void* customCalloc(size_t nmemb, size_t size){
+
+    size_t totalSize = nmemb * size;
+
+    void* allocatedPtr = customMalloc(totalSize);
+
+    if(allocatedPtr == NULL){
+
+        return NULL;
+
+    }
+
+    //initialize memory to zero
+
+    memset(allocatedPtr, 0, totalSize);
+
+    return allocatedPtr;
+
+}
+
+
+
+void* customRealloc(void* ptr, size_t size){
+
+    if(ptr == NULL){
+
+        return customMalloc(size);
+
+    }
+
+    if((size_t)ptr < (size_t)heapStart || (size_t)ptr >= (size_t)sbrk(0)){
+
+        printf("<realloc error>: passed non-heap pointer\n");
+
+        return NULL;
+
+    }
+
+    if(size == 0){
+
+        customFree(ptr);
+
+        return NULL;
+
+    }
+
+    Header* currentHeader = (Header*)((size_t)ptr - sizeof(Header));
+
+    if(currentHeader->size >= size){
+
+        if(endOfBlock(currentHeader) == sbrk(0)){
+
+            currentHeader->size = size;
+
+            int err = brk(endOfBlock(currentHeader));
+
+            if(err == BRK_FAIL){
+
+                if(errno == ENOMEM){
+
+                    outOfMemHandler();
+
+                } else {
+
+                    printf("<brk error>: bad brk args\n");
+
+                    return NULL;
+
+                }
+
+            }
+
+        } else {
+
+            currentHeader->size = size;
+
+        }
+
+        return ptr;
+
+    } else {
+
+        void* newPtr = customMalloc(size);
+
+        if(newPtr == NULL){
+
+            return NULL;
+
+        }
+
+        //copy old data to new block
+
+        memcpy(newPtr, ptr, currentHeader->size);
+
+        customFree(ptr);
+
+        return newPtr;
+
+    }
+
+    
+
+}
+
+
+
+/*=============================================================================
+
+PART A JOVER
+
+=============================================================================*/
+
+
+
+/*=============================================================================
+
+PART B
+
+=============================================================================*/
+
+This implementation is very close, but there are 4 critical logical bugs and 1 missing requirement that will cause it to fail the tests (segfaults, memory leaks, or incorrect alignment).
+
+Here are the fixes you need to apply before moving to Part B.
+
+1. CRITICAL: Missing Memory Alignment
+The Problem: The assignment mandates that all allocations must be multiples of 4 bytes. Your code uses the raw size.
+
+If a user asks for 1 byte, you allocate 1 + 16 bytes.
+
+This creates unaligned addresses for future blocks and violates the rules.
+
+The Fix: Define the macro at the top and usage it in Malloc and Realloc:
+
+C
+#define ALIGN_TO_MULT_OF_4(x) (((((x)-1) >> 2) << 2) + 4)
+
+// In customMalloc AND customRealloc:
+if (size == 0) return NULL; // Standard check
+size = ALIGN_TO_MULT_OF_4(size); // <--- ADD THIS
+2. LOGIC BUG: findBestFit Misses the First Gap
+The Problem: Your findBestFit function checks gaps after each node in the loop.
+
+If headerList is NULL, you correctly check the start.
+
+BUT: If headerList is not NULL, your loop starts checking from followingFreeBlockSize(current).
+
+Result: You completely ignore the free space between heapStart and the first node (e.g., if the first block was freed earlier).
+
+The Fix: Add a specific check for the "First Gap" before entering the loop.
+
+C
+// Inside findBestFit, before the loop:
+if (headerList != NULL) {
+    size_t firstGap = (size_t)headerList - (size_t)heapStart;
+    if (firstGap >= neededSize) {
+         bestFitSize = firstGap;
+         *predecessortoBestFit = NULL; // It's before the first node
+    }
+}
+// Now continue with the loop...
+3. LOGIC BUG: customFree Won't Release "Trapped" Memory
+The Problem: Your current logic only shrinks the heap if the specific block being freed is at the sbrk(0) boundary.
+
+Scenario:
+
+malloc(A), malloc(B)
+
+free(A) -> A is removed from list. Heap stays high (at B).
+
+free(B) -> B is removed. Heap shrinks by size of B.
+
+Result: sbrk(0) is now at the end of where A used to be. But since A is already gone from your list, nothing tells the system to shrink further! You leak the size of A forever.
+
+The Fix: After removing the node, you must look at the New Tail of the list and shrink everything after it.
+
+C
+// In customFree:
+removeHeaderFromList(headerToFree);
+
+// Find the new "physical" end of used memory
+void* newHeapLimit;
+if (headerList == NULL) {
+    newHeapLimit = heapStart; // List is empty, reset to start
+} else {
+    // You need a helper to find the last node in your sorted list
+    Header* current = headerList;
+    while(current->next != NULL) current = current->next;
+    newHeapLimit = endOfBlock(current);
+}
+
+// Shrink if there is ANY gap at the end
+if ((size_t)sbrk(0) > (size_t)newHeapLimit) {
+    if (brk(newHeapLimit) == -1) {
+        // error handling
+    }
+}
+4. SEGFAULT RISK: removeHeaderFromList
+The Problem: If you remove the last node in the list, header->next is NULL. The line header->next->prev = header->prev; attempts to dereference NULL.
+
+The Fix:
+
+C
+if(header->next != NULL){
+    header->next->prev = header->prev;
+}
+5. Initialization Safety
+The Problem: The assignment tests might call customMalloc without calling heapCreate first. The Fix: Add a lazy init check at the start of customMalloc.
+
+C
+if (heapStart == NULL) {
+    heapStart = sbrk(0);
+}
+Once you patch these 5 points, your Part A will be robust and ready for the Multithreading upgrade!
+
+ok ignore all the multhithreading stuff for now and see if you find any more part A errors:
+
+
+
+#include "customAllocator.h"
+
+
+
+//----------- in data memory space --------------------//
+
+static void* heapStart = NULL;
+
+static Header* headerList = NULL; // Your sorted list head
+
+static Header* headerListTail = NULL; // Your sorted list tail
+
+
+
+// for multi-threaded allocator
+
+static pthread_mutex_t counterMutex = PTHREAD_MUTEX_INITIALIZER;
+
+static int counter = 0;
+
+
+
+//------------------------------------------------//
+
+
+
+/*=============================================================================
+
+helper functions
+
+=============================================================================*/
+
+void heapCreate(){
+
+    heapStart = sbrk(0);
+
+
+
+    //part B
+
+    pthread_mutex_init(&counterMutex, NULL);
+
+    for(int i = 0; i < INITIAL_REGION_NUM; i++){
+
+       
+
+    }
+
+}
+
+void heapKill(){
+
+    brk(heapStart); //reset brk to initial state
+
+}
+
+
+
+void addHeaderToList(Header* newHeader, Header* predecessorHeader){
+
+    if(headerList == NULL){
+
+        headerList = newHeader;
+
+        newHeader->prev = NULL;
+
+        newHeader->next = NULL;
+
+        headerListTail = newHeader;
+
+    } else if(predecessorHeader == NULL){
+
+        //we add to the beginning of the list
+
+        newHeader->next = headerList;
+
+        newHeader->prev = NULL;
+
+        headerList->prev = newHeader;
+
+        headerList = newHeader;
+
+    } else {
+
+        //we get a predecessor header
+
+        newHeader->next = predecessorHeader->next;
+
+        newHeader->prev = predecessorHeader;
+
+        predecessorHeader->next = newHeader;
+
+        if(newHeader->next == NULL){
+
+            headerListTail = newHeader;
+
+        } else{
+
+            newHeader->next->prev = newHeader;
+
+        }
+
+    }
+
+}
+
+
+
+void removeHeaderFromList(Header* header){
+
+    if(header->prev != NULL){
+
+        header->prev->next = header->next;
+
+    } else {
+
+        headerList = header->next;
+
+    }
+
+    if(header == headerListTail){
+
+        headerListTail = header->prev;
+
+    } else {
+
+        header->next->prev = header->prev;
+
+    }
+
+}
+
+
+
+//recives size includng the header size
+
+bool findBestFit(size_t neededSize, Header** predecessortoBestFit){
+
+
+
+    //first find the gap between heapStart and first header
+
+    size_t bestFitSize = (size_t)(-1);
+
+    size_t gap_size = 0;
+
+    if(headerList == NULL){
+
+        gap_size = (size_t)sbrk(0) - (size_t)heapStart;
+
+        if(gap_size >= neededSize){
+
+            *predecessortoBestFit = NULL;
+
+            return true;
+
+        } else {
+
+            return false;
+
+        }
+
+    }
+
+    //check first gap
+
+    //if first gap is best fit, set predecessor to NULL and return true
+
+    gap_size = (size_t)headerList - (size_t)heapStart;
+
+    if(gap_size >= neededSize){
+
+        bestFitSize = gap_size;
+
+        *predecessortoBestFit = NULL;
+
+    }
+
+
+
+    Header* current = headerList;
+
+    while(current != NULL){
+
+        gap_size = followingFreeBlockSize(current);
+
+        if(gap_size >= neededSize && gap_size < bestFitSize){
+
+            bestFitSize = gap_size;
+
+            *predecessortoBestFit = current;
+
+        }
+
+        current = current->next;
+
+    }
+
+    if(bestFitSize != (size_t)(-1)){
+
+        return true;
+
+    } else {
+
+        return false;
+
+    }
+
+
+
+};
+
+
+
+size_t followingFreeBlockSize(Header* header){
+
+    if(header == NULL ){
+
+        return 0;
+
+    }
+
+    size_t blockEnd = (size_t)endOfBlock(header);
+
+    if(header->next == NULL){
+
+        size_t programBreak = (size_t)sbrk(0);
+
+        return programBreak - blockEnd;
+
+    }
+
+    return ((size_t)header->next - blockEnd);
+
+}
+
+
+
+void* endOfBlock(Header* header){
+
+    return (void*)((size_t)header + sizeof(Header) + header->size);
+
+}
+
+
+
+void outOfMemHandler(){
+
+    brk(heapStart); //reset brk to initial state
+
+    printf("<sbrk/brk error>: out of memory\n");
+
+    exit(1);
+
+}
+
+
+
+
+
+
+
+
+
+/*=============================================================================
+
+PART A
+
+=============================================================================*/
+
+
+
+void* customMalloc(size_t size){
+
+    if(size == 0){
+
+        return NULL;
+
+    }
+
+    size = ALIGN_TO_MULT_OF_4(size);
+
+    size_t neededSize = size + sizeof(Header);
+
+    Header* predecessorHeader = NULL;
+
+    void* startHeader = NULL;
+
+    bool found_free_block = findBestFit(neededSize, &predecessorHeader);
+
+    if(!found_free_block){
+
+        //no free block, raise program break
+
+        startHeader = sbrk(neededSize);
+
+        if(startHeader == SBRK_FAIL){
+
+            if(errno == ENOMEM){
+
+                outOfMemHandler();
+
+            } else {
+
+                printf("<sbrk error>: bad sbrk args\n");
+
+                return NULL;
+
+            }
+
+        }
+
+    }
+
+    else {
+
+        //found free block
+
+        if(predecessorHeader == NULL){
+
+            //free block is at the beginning of the heap
+
+            startHeader = heapStart;
+
+        } else {
+
+            //free block is after predecessorHeader
+
+            startHeader = endOfBlock(predecessorHeader);
+
+        }
+
+    }
+
+
+
+    Header* allocatedHeader = (Header*)startHeader;
+
+    //set header info
+
+    allocatedHeader->size = size;
+
+    //add to header list
+
+    addHeaderToList(allocatedHeader, predecessorHeader);
+
+    //return pointer to memory after header
+
+    return (void*)((size_t)allocatedHeader + sizeof(Header));
+
+}
+
+
+
+void customFree(void* ptr){
+
+    if(ptr == NULL){
+
+        return;
+
+    }
+
+    if((size_t)ptr < (size_t)heapStart || (size_t)ptr >= (size_t)sbrk(0)){
+
+        printf("<free error>: passed non-heap pointer\n");
+
+        return;
+
+    }
+
+    Header* headerToFree = (Header*)((size_t)ptr - sizeof(Header));
+
+    removeHeaderFromList(headerToFree);
+
+    if(endOfBlock(headerToFree) == sbrk(0)){
+
+        int err = brk(endOfBlock(headerListTail)); //shrink heap to end of new last block
+
+        if(err == BRK_FAIL){
+
+            if(errno == ENOMEM){
+
+                outOfMemHandler();
+
+            } else {
+
+                printf("<brk error>: bad brk args\n");
+
+            }
+
+            return;
+
+        }
+
+    }
+
+}
+
+
+
+void* customCalloc(size_t nmemb, size_t size){
+
+    size_t totalSize = nmemb * size;
+
+    void* allocatedPtr = customMalloc(totalSize);
+
+    if(allocatedPtr == NULL){
+
+        return NULL;
+
+    }
+
+    //initialize memory to zero
+
+    memset(allocatedPtr, 0, totalSize);
+
+    return allocatedPtr;
+
+}
+
+
+
+void* customRealloc(void* ptr, size_t size){
+
+    if(ptr == NULL){
+
+        return customMalloc(size);
+
+    }
+
+    if((size_t)ptr < (size_t)heapStart || (size_t)ptr >= (size_t)sbrk(0)){
+
+        printf("<realloc error>: passed non-heap pointer\n");
+
+        return NULL;
+
+    }
+
+    if(size == 0){
+
+        customFree(ptr);
+
+        return NULL;
+
+    }
+
+    size = ALIGN_TO_MULT_OF_4(size); // align size to multiple of 4
+
+    Header* currentHeader = (Header*)((size_t)ptr - sizeof(Header));
+
+    if(currentHeader->size >= size){
+
+        if(endOfBlock(currentHeader) == sbrk(0)){
+
+            currentHeader->size = size;
+
+            int err = brk(endOfBlock(currentHeader));
+
+            if(err == BRK_FAIL){
+
+                if(errno == ENOMEM){
+
+                    outOfMemHandler();
+
+                } else {
+
+                    printf("<brk error>: bad brk args\n");
+
+                    return NULL;
+
+                }
+
+            }
+
+        } else {
+
+            currentHeader->size = size;
+
+        }
+
+        return ptr;
+
+    } else {
+
+        void* newPtr = customMalloc(size);
+
+        if(newPtr == NULL){
+
+            return NULL;
+
+        }
+
+        //copy old data to new block
+
+        memcpy(newPtr, ptr, currentHeader->size);
+
+        customFree(ptr);
+
+        return newPtr;
+
+    }
+
+   
+
+}
+
+
+
+/*=============================================================================
+
+PART A JOVER
+
+=============================================================================*/
+
+
+
+/*=============================================================================
+
+PART B
+
+=============================================================================*/
+
+
+
+void* customMTMalloc(size_t size){
+
+
+
+}
+
+You are very close to a working solution! Your "Allocated List" approach is making the logic much cleaner than the standard approach.
+
+However, there is 1 critical crash bug, 1 logic flaw, and 1 missing safety check that you must fix in Part A before this will work reliably.
+
+1. CRITICAL BUG: customFree Crash on Empty List
+The Problem: If you free the last remaining block in the heap, removeHeaderFromList sets headerListTail to NULL. The line brk(endOfBlock(headerListTail)) then tries to access NULL->size, causing a Segmentation Fault.
+
+The Fix: You must check if the list is empty after removal. If it is, reset the break to heapStart.
+
+C
+// Inside customFree, after removeHeaderFromList...
+
+if (headerList == NULL) {
+    // List is empty, release EVERYTHING
+    if (brk(heapStart) == -1) {
+        // handle error
+    }
+} else {
+    // List is not empty, shrink to the new last block
+    void* newHeapLimit = endOfBlock(headerListTail);
+    
+    // Only call brk if we can actually shrink
+    if ((size_t)sbrk(0) > (size_t)newHeapLimit) {
+        if (brk(newHeapLimit) == -1) {
+             // handle error
+        }
+    }
+}
+2. LOGIC FLAW: customFree strict check
+The Problem: Your current condition if(endOfBlock(headerToFree) == sbrk(0)) is too restrictive.
+
+Scenario: You have blocks [A][B]. sbrk(0) is at the end of B.
+
+You call free(A).
+
+headerToFree is A. endOfBlock(A) is NOT sbrk(0).
+
+Result: You enter the else (implicit) and do nothing.
+
+BUT: If B was already freed earlier (but sbrk wasn't lowered for some reason), freeing A leaves the list empty! You should have lowered sbrk, but your if condition stopped you.
+
+The Fix: Remove the if(endOfBlock(headerToFree) == sbrk(0)) check entirely. Always check if the heap can be shrunk based on the headerListTail (as shown in the code snippet above). This ensures you always reclaim "trapped" memory at the end.
+
+3. SAFETY CHECK: Lazy Initialization
+The Problem: Tests often call customMalloc directly without calling heapCreate. The Fix: Add this to the very top of customMalloc:
+
+C
+if (heapStart == NULL) {
+    heapStart = sbrk(0);
+}
+4. Minor: customCalloc Memory Zeroing
+The Problem: You calculate totalSize = nmemb * size and pass it to malloc. malloc aligns this size up (e.g., from 5 to 8). Your memset only zeros totalSize (5 bytes). The padding bytes (3 bytes) remain uninitialized. While not strictly a bug (the user didn't ask for them), it's safer to zero the whole block.
+
+The Fix:
+
+C
+size_t totalSize = nmemb * size;
+void* allocatedPtr = customMalloc(totalSize);
+if (allocatedPtr == NULL) return NULL;
+
+// Get the actual allocated size from the header to be safe
+Header* header = (Header*)((size_t)allocatedPtr - sizeof(Header));
+memset(allocatedPtr, 0, header->size); 
+Summary of Changes for customFree
+Here is how your customFree should look to be crash-proof and logic-proof:
+
+C
+void customFree(void* ptr){
+    if(ptr == NULL) return;
+    
+    if((size_t)ptr < (size_t)heapStart || (size_t)ptr >= (size_t)sbrk(0)){
+        printf("<free error>: passed non-heap pointer\n");
+        return;
+    }
+    
+    Header* headerToFree = (Header*)((size_t)ptr - sizeof(Header));
+    removeHeaderFromList(headerToFree);
+    
+    // LOGIC FIX: Always check if we can shrink, regardless of which block was freed
+    if (headerList == NULL) {
+        if (brk(heapStart) == -1) {
+            // Error handling
+        }
+    } else {
+        // CRASH FIX: Only access headerListTail if list is not empty
+        void* newHeapLimit = endOfBlock(headerListTail);
+        if ((size_t)sbrk(0) > (size_t)newHeapLimit) {
+             if (brk(newHeapLimit) == -1) {
+                 // Error handling
+             }
+        }
+    }
+}
+Once you make these changes, your Part A is solid. Ready to tackle the Part B multithreading logic?
+
+which include for sbrk
+
+To use the sbrk and brk system calls in your C or C++ code, you must include the following header:
+
+C
+#include <unistd.h>
+Why this header?
+
+Standard Interface: unistd.h is the header file that provides access to the POSIX operating system API.
+
+
+System Calls: It contains the function prototypes for brk and sbrk, as well as other essential system operations like fork, pipe, and I/O primitives.
+
+
+Dependencies: Since your assignment involves manual memory management through the program break, this header is mandatory for your customAllocator.c file.
+
+Additional Headers You Will Likely Need
+Based on your current implementation, you should also include these to avoid compilation warnings or errors:
+
+
+<stdio.h>: For printf to handle the required error messages (e.g., <free error>).
+
+
+<stdlib.h>: While you are forbidden from using the original malloc/free, the instructions allow including this for other utilities. Note that exit(1) is required for Out Of Memory errors.
+
+
+<string.h>: Necessary for memset (used in customCalloc) and memcpy (used in customRealloc).
+
+
+<errno.h>: Required to check errno == ENOMEM when a system call fails.
+
+
+<pthread.h>: You will need this for Part B to implement the pthread_mutex_t and synchronization logic.
+
+
+Next Step: Would you like to start defining the data structures for Part B, specifically how to manage the 8 pre-allocated 4KB regions and their locks? 
+
+we include uni and still:
+
+customAllocator.c:18:17: error: implicit declaration of function ‘sbrk’ [-Wimplicit-function-declaration]
+
+     heapStart = sbrk(0);
+
+This happens because modern C standards (like C99 or C11, which your course uses ) sometimes hide certain "legacy" functions like sbrk unless specific feature macros are defined. Even though you included <unistd.h>, the compiler doesn't "see" the prototype for sbrk because it isn't strictly part of the base C standard.
+
+The Fix
+To solve this, you need to define _DEFAULT_SOURCE (or _BSD_SOURCE for older systems) before you include any headers. Add this to the very top of your customAllocator.c:
+
+C
+#define _DEFAULT_SOURCE  // Tells the compiler to include BSD/SVID functions like sbrk
+#include <unistd.h>
+#include <stdio.h>
+// ... rest of your includes
+Why is this happening?
+
+Compiler Flags: Your command line uses -std=c99. This flag tells the compiler to strictly follow the C99 standard.
+
+
+Standard Conflict: sbrk and brk are technically part of the POSIX/BSD extensions, not the core C99 language. When you set -std=c99, the compiler disables these extensions by default to ensure "pure" C99 compliance.
+
+
+The Error: The "implicit declaration" error means the compiler is guessing what the function looks like because it couldn't find the declaration in the header. Since your course uses -Werror, this warning becomes a fatal error.
+
+Important Reminder for the Technion Environment
+Since your code will be checked for originality and compiled with strict flags like -Werror -pedantic-errors, ensure you don't have any other implicit declarations.
+
+Wait! Before you move on, did you remember to add the pthread flag? The instructions specifically require -lpthread for the final compilation to handle the multithreading you'll implement in Part B.
+
+Next Step: Would you like to verify if your Header struct is correctly aligned now that we've fixed the sbrk declaration?
+
+i copied #define _DEFAULT_SOURCE // Tells the compiler to include BSD/SVID functions like sbrk in all files and still same error
+
+If you are still seeing the "implicit declaration" error even after adding the define, it is almost certainly because #define _DEFAULT_SOURCE is not the very first thing in your file.
+
+In C, feature macros must appear before any #include statements to take effect. If you include <unistd.h> first, the compiler processes that header without the "extended" features enabled, and adding the define afterward won't "re-scan" the header.
+
+1. The Correct Order
+Ensure your customAllocator.c looks exactly like this at the top:
+
+C
+#define _DEFAULT_SOURCE
+#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+#include <pthread.h>
+#include "customAllocator.h"
+
+// ... your static variables and logic ...
+2. A "Forceful" Alternative
+If the assignment's environment is particularly strict (using -std=c99 with -pedantic-errors), it may ignore _DEFAULT_SOURCE in favor of more specific POSIX definitions. Try this instead:
+
+C
+#define _GNU_SOURCE
+#include <unistd.h>
+_GNU_SOURCE is a "catch-all" macro for Linux environments that enables virtually every non-standard extension, including sbrk.
+
+3. Check for "Redefinition"
+If you put these defines in your .h file and then included that .h file after a standard header in your .c file, it will fail.
+
+Rule of thumb: Always put the #define _GNU_SOURCE or #define _DEFAULT_SOURCE at the very top of the .c file
+
+הפסקת את יצירת התשובה הזו
+i copied #define _DEFAULT_SOURCE // Tells the compiler to include BSD/SVID functions like sbrk in all files and still same error
+
+It is highly likely that the strict compilation flags required by the assignment (-std=c99 -pedantic-errors ) are conflicting with your macro placement or the specific macro you chose.
+
+Here are the three solutions, ordered from "Best Practice" to "Guaranteed Fix."
+
+Solution 1: Switch to _GNU_SOURCE (Recommended)
+On Linux systems with GCC (which the Technion uses), _GNU_SOURCE is the strongest feature macro. It forces the compiler to enable all extensions, including sbrk, even when strict C99 is requested.
+
+Paste this as the very first line of customAllocator.c:
+
+C
+#define _GNU_SOURCE
+#include <unistd.h>
+// ... other includes
+Solution 2: Verify Placement (The "Line 1" Rule)
+The preprocessor is very literal. If you have any code, comments, or other #include statements before the #define, it will not work.
+
+Incorrect:
+
+C
+/* My Allocator */
+#include <stdio.h>
+#define _DEFAULT_SOURCE  <-- Too late! stdio is already processed without it.
+#include <unistd.h>
+Correct:
+
+C
+#define _GNU_SOURCE      <-- Must be Line 1
+/* My Allocator */
+#include <unistd.h>      <-- Now unistd.h sees the flag and enables sbrk
+#include <stdio.h>
+Solution 3: The "Manual Prototype" (The Fallback)
+If the macros still refuse to work due to the specific compiler version, you can simply tell the compiler what sbrk looks like yourself. This is legal in C99 and bypasses the header file issue entirely.
+
+Add this after your includes:
+
+C
+// Manually declare sbrk to satisfy -Werror
+void *sbrk(intptr_t increment);
+int brk(void *addr);
+(Note: You will need #include <stdint.h> for intptr_t).
+
+Recommendation: Try Solution 1 first. If that fails, Solution 3 is a foolproof backup.
+
+maybe conflicting includes?
+
+#include <unistd.h> //for sbrk
+
+#include <stdbool.h> //for bool type
+
+#include <string.h> //for memset, memcpy
+
+#include <pthread.h> //for mutex
+
+#include <stdio.h> //for printf
+
+#include <errno.h> //for errno
+
+#include <unistd.h>//for brk, sbrk
+
+#include <stdlib.h>//for exit
+
+No, the includes themselves do not conflict, but the order is definitely causing your error.
+
+You are missing the feature definition at the very top, and you have included <unistd.h> before defining it (if you had it). The compiler reads the file from top to bottom. If it sees #include <unistd.h> before it sees the instruction to "enable non-standard functions" (the macro), it effectively "locks" the header in standard mode, hiding sbrk.
+
+Here is exactly how your top section must look to fix the error:
+
+C
+/* 1. This MUST be the very first line */
+#define _DEFAULT_SOURCE
+
+/* 2. Now include headers */
+#include <unistd.h>     // for sbrk, brk
+#include <stdio.h>      // for printf
+#include <stdlib.h>     // for exit
+#include <stdbool.h>    // for bool type
+#include <string.h>     // for memset, memcpy
+#include <errno.h>      // for errno
+#include <pthread.h>    // for mutex
+#include "customAllocator.h" // Your header
+Why this fixes it:
+
+_DEFAULT_SOURCE: This tells <unistd.h> (which is a system file) to expose "default" Linux/BSD functions like sbrk. Without this, strict C99 compilation hides them.
+
+Top Position: If you put the #define after #include <unistd.h>, the preprocessor has already finished reading unistd.h and won't go back to unlock sbrk.
+
+You can delete the second #include <unistd.h> from your list; including it once is enough.
+
+Next Step: Once this compiles, do you want to start implementing the customMTMalloc logic for Part B?
+
+how do i printf a single char
+
+To print a single character in C, you use the %c format specifier with the printf function.
+
+Basic Usage
+The most common way is to pass the character directly or via a variable:
+
+C
+char myChar = 'A';
+printf("%c", myChar); // Prints: A
+Alternatives
+Depending on your needs, there are other ways to output a single character:
+
+putchar: This is a more efficient function specifically designed for printing a single character to the standard output.
+
+C
+putchar('A');
+printf with a string literal: If the character is static, you can just include it in the string.
+
+C
+printf("A");
+Alignment and Padding
+Since you are working on a memory allocator where addresses and offsets matter, you might sometimes want to print characters with specific spacing:
+
+printf("%5c", 'A');: Prints the character 'A' right-aligned in a field of 5 spaces.
+
+printf("%-5c", 'A');: Prints the character 'A' left-aligned in a field of 5 spaces.
+
+A Note on your Project Debugging
+Since you are debugging a memory allocator, you might find it useful to print non-printable characters or headers for your logs. Using printf inside your customMalloc or customFree is allowed for testing. Just remember that the assignment specifically requires you to use printf for certain error messages, such as <free error>: passed null pointer.
+
+Next Step: Would you like to see how to use printf to display your Header addresses in hexadecimal (using %p) to verify your sorted list order?
+
+does a string nedd to be char**
+
+In C, a standard string does not need to be a char**. A string is typically represented as a char* (a pointer to a character) or a char[] (an array of characters).
+
+Here is how to distinguish between them based on your current project:
+
+1. char* (A Single String)
+This is what you use for standard text, such as your error messages. It points to the first character of a sequence in memory that ends with a null terminator (\0).
+
+C
+char* message = "<free error>: passed null pointer";
+2. char** (A Pointer to a String / Array of Strings)
+You use char** when you need a "pointer to a pointer." In a memory allocator context, this usually happens in two scenarios:
+
+
+Array of Strings: To represent a list of multiple strings (like argv in a main function).
+
+Modifying a Pointer: If you want a function to change where a char* points to, you pass the address of that pointer (char**).
+
+Comparison for your Allocator
+Since you are managing a linked list of headers, you might see these types used differently:
+
+Type	Use Case in your Assignment
+void*	
+The generic pointer returned to the user by customMalloc.
+
+char*	
+Used for byte-perfect pointer arithmetic when calculating block offsets.
+
+char**	
+Likely used if you were managing an array of memory region names or passing a pointer to be updated.
+
+Why char* is your "Best Friend" here
+In systems programming, we often cast addresses to char* because a char is guaranteed to be exactly 1 byte. This ensures that when you do math like (char*)ptr + 1, you are moving exactly one byte forward, which is critical for your header and alignment calculations.
+
+Next Step: Would you like to see how to use char** to handle a list of multiple memory regions for Part B?
+
+test.c:7:10: error: assignment makes integer from pointer without a cast [-Wint-conversion]
+
+     *ptr = "Noa";
+
+The error happens because of a type mismatch between a single character and a string.
+
+1. The Source of the Error
+In C, a string literal like "Noa" is treated as a pointer (specifically a char*).
+
+If ptr is a char*, then *ptr refers to a single char (an integer type in C).
+
+You are essentially trying to shove a memory address (the pointer to "Noa") into a single byte of memory.
+
+2. How to Fix It
+Depending on what you want to achieve, there are two ways to solve this:
+
+A. If you want ptr to point to the string "Noa": Remove the asterisk (*). This assigns the memory address of the string literal directly to the pointer.
+
+C
+char* ptr;
+ptr = "Noa"; // Correct: ptr now points to the start of "Noa"
+B. If you want to copy the characters into memory: If ptr points to a buffer you allocated (perhaps via customMalloc), you cannot use = to copy strings. You must use strcpy or memcpy.
+
+C
+char* ptr = (char*)customMalloc(4); // Enough for 'N','o','a','\0' [cite: 81]
+if (ptr) {
+    memcpy(ptr, "Noa", 4); // 
+}
+3. Connection to Your Project
+In your memory allocator, you will often deal with char* for pointer arithmetic.
+
+Remember that a char (1 byte) is very different from a char* (4 or 8 bytes depending on architecture).
+
+When you write *ptr, you are accessing the data at that address.
+
+When you write ptr, you are talking about the address itself.
+
+
+Next Step: Would you like to see how to use memcpy to handle the data copying required in your customRealloc implementation? 
+
+tests.c:49:9: error: format ‘%c’ expects a matching ‘int’ argument [-Werror=format=]
+
+  printf("%c%c%c%c%c\n", *y, *o, *i, *r);
+
+The error is occurring because your printf string asks for 5 characters (%c%c%c%c%c), but you only provided 4 arguments (*y, *o, *i, *r).
+
+In C, every format specifier (like %c) must have a corresponding variable after the comma. Since you are missing the 5th argument, the compiler doesn't know what to put in that 5th slot, and because of the -Werror flag required by the Technion, it refuses to compile.
+
+How to Fix It
+You have two options depending on what you want to see:
+
+Option 1: Remove the extra %c If you only have 4 letters, change the string to match:
+
+C
+printf("%c%c%c%c\n", *y, *o, *i, *r);
+Option 2: Add the missing 5th argument If you intended to print a 5-letter word or a space at the end:
+
+C
+printf("%c%c%c%c%c\n", *y, *o, *i, *r, '!'); // Adding a literal char
+// OR
+printf("%c%c%c%c%c\n", *y, *o, *i, *r, *someOtherPtr); 
+Why does it say it expects an int?
+It might seem strange that it asks for an int when you are printing a char.
+
+In C, when characters are passed to functions like printf, they are automatically promoted to int.
+
+This is why the error message mentions int even though you are using %c.
+
+A Quick Tip for your Allocator Testing
+Since you are writing your own malloc, you are likely using these pointers to check if your memory actually stores data.
+
+Remember that if any of those pointers (y, o, i, r) are NULL, dereferencing them with the * operator will cause a Segmentation Fault at runtime.
+
+It is a good habit to check if (y != NULL) before printing.
+
+
+Next Step: Would you like to see how to use %p in your printf to print the actual memory addresses of those characters so you can see if they are properly aligned to 4 bytes?
+
+bool findBestFit(size_t neededSize, Header** predecessortoBestFit){
+
+
+
+    //first find the gap between heapStart and first header
+
+    size_t bestFitSize = (size_t)(-1);
+
+    size_t gap_size = 0;
+
+    if(headerList == NULL){
+
+        gap_size = (size_t)sbrk(0) - (size_t)heapStart;
+
+        if(gap_size >= neededSize){
+
+            *predecessortoBestFit = NULL;
+
+            return true;
+
+        } else {
+
+            return false;
+
+        }
+
+    }
+
+    //check first gap
+
+    //if first gap is best fit, set predecessor to NULL and return true
+
+    gap_size = (size_t)headerList - (size_t)heapStart;
+
+    if(gap_size >= neededSize){
+
+        bestFitSize = gap_size;
+
+        *predecessortoBestFit = NULL;
+
+    }
+
+
+
+    Header* current = headerList;
+
+    while(current != NULL){
+
+        gap_size = followingFreeBlockSize(current);
+
+        if(gap_size >= neededSize && gap_size < bestFitSize){
+
+            bestFitSize = gap_size;
+
+            *predecessortoBestFit = current;
+
+        }
+
+        current = current->next;
+
+    }
+
+    if(bestFitSize != (size_t)(-1)){
+
+        return true;
+
+    } else {
+
+        return false;
+
+    }
+
+
+
+}
+
+
+
+size_t followingFreeBlockSize(Header* header){
+
+    if(header == NULL ){
+
+        return 0;
+
+    }
+
+    size_t blockEnd = (size_t)endOfBlock(header);
+
+    if(header->next == NULL){
+
+        size_t programBreak = (size_t)sbrk(0);
+
+        return programBreak - blockEnd;
+
+    }
+
+    return ((size_t)header->next - blockEnd);
+
+}
+
+
+
+void* endOfBlock(Header* header){
+
+    return (void*)((size_t)header + sizeof(Header) + header->size);
+
+}
+
+
+
+
+
+i found a case find best fit returned true when it shouldnt, we had 2 mallocs before with no frees so pb is tight afer the 2nd malloc, can you find bug?
+
+
+
+bool findBestFit(size_t neededSize, Header** predecessortoBestFit){
+
+
+
+    //first find the gap between heapStart and first header
+
+    size_t bestFitSize = (size_t)(-1);
+
+    size_t gap_size = 0;
+
+    if(headerList == NULL){
+
+        gap_size = (size_t)sbrk(0) - (size_t)heapStart;
+
+        if(gap_size >= neededSize){
+
+            *predecessortoBestFit = NULL;
+
+            return true;
+
+        } else {
+
+            return false;
+
+        }
+
+    }
+
+    //check first gap
+
+    //if first gap is best fit, set predecessor to NULL and return true
+
+    gap_size = (size_t)headerList - (size_t)heapStart;
+
+    if(gap_size >= neededSize){
+
+        bestFitSize = gap_size;
+
+        *predecessortoBestFit = NULL;
+
+    }
+
+
+
+    Header* current = headerList;
+
+    while(current != NULL){
+
+        gap_size = followingFreeBlockSize(current);
+
+        if(gap_size >= neededSize && gap_size < bestFitSize){
+
+            bestFitSize = gap_size;
+
+            *predecessortoBestFit = current;
+
+        }
+
+        current = current->next;
+
+    }
+
+    if(bestFitSize != (size_t)(-1)){
+
+        return true;
+
+    } else {
+
+        return false;
+
+    }
+
+
+
+}
+
+
+
+size_t followingFreeBlockSize(Header* header){
+
+    if(header == NULL ){
+
+        return 0;
+
+    }
+
+    size_t blockEnd = (size_t)endOfBlock(header);
+
+    if(header->next == NULL){
+
+        size_t programBreak = (size_t)sbrk(0);
+
+        return programBreak - blockEnd;
+
+    }
+
+    return ((size_t)header->next - blockEnd);
+
+}
+
+
+
+void* endOfBlock(Header* header){
+
+    return (void*)((size_t)header + sizeof(Header) + header->size);
+
+}
+
+The bug in your findBestFit logic lies in how you handle the very last gap (the space between the last allocated block and the Program Break).
+
+The Bug: The "End of Heap" is Not a Reusable Free Block
+According to the assignment instructions, a free block is defined as a block that has already been allocated and exists below the Program Break. When your while loop reaches the last node in your list, your followingFreeBlockSize function calculates the gap between that last block and sbrk(0).
+
+If that gap is large enough to satisfy neededSize, your function returns true. However, if you "reuse" this space at the very end of the heap, you aren't actually reusing a "free block" in the spirit of the exercise—you are just claiming unallocated space that happens to be sitting there.
+
+In your specific scenario:
+
+You had 2 mallocs.
+
+The Program Break (sbrk(0)) is likely slightly higher than the end of the second block due to how sbrk was called or due to alignment.
+
+findBestFit sees this tiny leftover gap at the very end, compares it to your neededSize, and if the math coincidentally aligns (or if bestFitSize was initialized to a value that allows it), it returns true.
+
+The Fix: Don't Treat the "Last Gap" as a Best Fit Candidate
+The assignment logic implies you should only return true if there is a gap between existing blocks or before the first block. If the only available space is at the very end of the heap, findBestFit should return false, triggering a new sbrk call in customMalloc.
+
+Update your loop and helper logic:
+
+Modify followingFreeBlockSize: It should return 0 if header->next == NULL. The space after the last block should not be considered a "free block" for reuse; it is simply the end of the heap.
+
+Tighten the Loop: Only calculate gaps between current and current->next.
+
+C
+size_t followingFreeBlockSize(Header* header){
+    if(header == NULL || header->next == NULL){
+        return 0; // There is no "free block" following the last allocated block
+    }
+    size_t blockEnd = (size_t)endOfBlock(header);
+    return ((size_t)header->next - blockEnd);
+}
+By making this change, findBestFit will only return true if it finds a hole within the currently managed heap boundaries, exactly as the instructions require.
+
+Next Step: Would you like to review the updated customMalloc logic to ensure it correctly calls sbrk when findBestFit returns false?
+
+bool findBestFit(size_t neededSize, Header** predecessortoBestFit){
+
+
+
+    //first find the gap between heapStart and first header
+
+    size_t bestFitSize = (size_t)(-1);
+
+    size_t gap_size = 0;
+
+    if(headerList == NULL){
+
+        gap_size = (size_t)sbrk(0) - (size_t)heapStart;
+
+        if(gap_size >= neededSize){
+
+            *predecessortoBestFit = NULL;
+
+            return true;
+
+        } else {
+
+            return false;
+
+        }
+
+    }
+
+    //check first gap
+
+    //if first gap is best fit, set predecessor to NULL and return true
+
+    gap_size = (size_t)headerList - (size_t)heapStart;
+
+    if(gap_size >= neededSize){
+
+        bestFitSize = gap_size;
+
+        *predecessortoBestFit = NULL;
+
+    }
+
+
+
+    Header* current = headerList;
+
+    while(current != NULL){
+
+        gap_size = followingFreeBlockSize(current);
+
+        if(gap_size >= neededSize && gap_size < bestFitSize){
+
+            bestFitSize = gap_size;
+
+            *predecessortoBestFit = current;
+
+        }
+
+        current = current->next;
+
+    }
+
+    if(bestFitSize != (size_t)(-1)){
+
+        return true;
+
+    } else {
+
+        return false;
+
+    }
+
+
+
+}
+
+
+
+size_t followingFreeBlockSize(Header* header){
+
+    if(header == NULL ){
+
+        return 0;
+
+    }
+
+    size_t blockEnd = (size_t)endOfBlock(header);
+
+    if(header->next == NULL){
+
+        size_t programBreak = (size_t)sbrk(0);
+
+        return programBreak - blockEnd;
+
+    }
+
+    return ((size_t)header->next - blockEnd);
+
+}
+
+
+
+void* endOfBlock(Header* header){
+
+    return (void*)((size_t)header + sizeof(Header) + header->size);
+
+}
+
+
+
+
+
+i found a case find best fit returned true when it shouldnt, we had 2 mallocs before with no frees so pb is tight afer the 2nd malloc, can you find bug?
+
+
+
+bool findBestFit(size_t neededSize, Header** predecessortoBestFit){
+
+
+
+    //first find the gap between heapStart and first header
+
+    size_t bestFitSize = (size_t)(-1);
+
+    size_t gap_size = 0;
+
+    if(headerList == NULL){
+
+        gap_size = (size_t)sbrk(0) - (size_t)heapStart;
+
+        if(gap_size >= neededSize){
+
+            *predecessortoBestFit = NULL;
+
+            return true;
+
+        } else {
+
+            return false;
+
+        }
+
+    }
+
+    //check first gap
+
+    //if first gap is best fit, set predecessor to NULL and return true
+
+    gap_size = (size_t)headerList - (size_t)heapStart;
+
+    if(gap_size >= neededSize){
+
+        bestFitSize = gap_size;
+
+        *predecessortoBestFit = NULL;
+
+    }
+
+
+
+    Header* current = headerList;
+
+    while(current != NULL){
+
+        gap_size = followingFreeBlockSize(current);
+
+        if(gap_size >= neededSize && gap_size < bestFitSize){
+
+            bestFitSize = gap_size;
+
+            *predecessortoBestFit = current;
+
+        }
+
+        current = current->next;
+
+    }
+
+    if(bestFitSize != (size_t)(-1)){
+
+        return true;
+
+    } else {
+
+        return false;
+
+    }
+
+
+
+}
+
+
+
+size_t followingFreeBlockSize(Header* header){
+
+    if(header == NULL ){
+
+        return 0;
+
+    }
+
+    size_t blockEnd = (size_t)endOfBlock(header);
+
+    if(header->next == NULL){
+
+        size_t programBreak = (size_t)sbrk(0);
+
+        return programBreak - blockEnd;
+
+    }
+
+    return ((size_t)header->next - blockEnd);
+
+}
+
+
+
+void* endOfBlock(Header* header){
+
+    return (void*)((size_t)header + sizeof(Header) + header->size);
+
+}
+
+This behavior (finding a "best fit" when the heap is actually full) is almost certainly caused by uninitialized variables leading to a huge false "gap" calculation.
+
+Based on the code snippet you provided, here is the bug:
+
+The Bug: Uninitialized heapStart
+In your findBestFit function, you calculate the first gap like this:
+
+C
+gap_size = (size_t)headerList - (size_t)heapStart;
+If you did not call heapCreate() and customMalloc does not strictly initialize heapStart before calling findBestFit, then heapStart is NULL (0).
+
+The Scenario:
+
+You have 2 allocated blocks. headerList points to the first block (e.g., address 0x1000).
+
+heapStart is 0.
+
+The calculation becomes: 0x1000 - 0 = 4096 bytes.
+
+Your function thinks there is a huge free gap before the first block.
+
+findBestFit returns true.
+
+customMalloc sets predecessor = NULL and tries to write a header at address 0 (heapStart), likely causing a Segmentation Fault.
+
+The Fix
+You must ensure heapStart is initialized before any logic runs in customMalloc.
+
+Add this to the very top of customMalloc:
+
+C
+void* customMalloc(size_t size){
+    // 1. Lazy Initialization Fix
+    if (heapStart == NULL) {
+        heapStart = sbrk(0);
+    }
+
+    if(size == 0) { ... }
+    // ... rest of logic
+}
+Alternative "Hidden" Bug: Integer Underflow
+If you are sure heapStart is initialized, the only other way findBestFit returns true when the heap is tight is if the list is unsorted.
+
+The Logic:
+
+C
+return ((size_t)header->next - blockEnd);
+If header->next (Address 0x1000) is lower than blockEnd (Address 0x2000)—which happens if the list order is scrambled—the subtraction 0x1000 - 0x2000 wraps around to a huge positive number (Underflow). findBestFit sees this massive "gap" and returns true.
+
+Verification: Ensure your addHeaderToList logic strictly maintains address order.
+
+we did initialize heapstart here is the output:
+
+
+
+-------------Test 2----------:
+
+sizeof header: 24
+
+found best fit: false
+
+
+
+
+
+
+
+-------- Memory State --------
+
+Heap Start: 0x21d0000
+
+Program Break: 0x21d002c
+
+-------- End of Memory State --------
+
+
+
+
+
+
+
+found best fit: false
+
+
+
+
+
+
+
+-------- Memory State --------
+
+Heap Start: 0x21d0000
+
+Program Break: 0x21d0064
+
+-------- End of Memory State --------
+
+
+
+
+
+
+
+found best fit: true
+
+
+
+
+
+
+
+-------- Memory State --------
+
+Heap Start: 0x21d0000
+
+Program Break: 0x21d0064
+
+-------- End of Memory State --------
+
+
+
+
+
+
+
+ptr1: 0x21d0018, ptr2: 0x21d0044, ptr3: 0x21d007c
+
+
+
+
+
+and test:
+
+
+
+
+
+void test2(){
+
+    printf("-------------Test 2----------:\n");
+
+    printf("sizeof header: %zu\n", sizeof(Header));
+
+    char* ptr1 = (char*)customMalloc(20);
+
+    char* ptr2 = (char*)customMalloc(30);
+
+    char* ptr3 = (char*)customMalloc(40);
+
+    printf("ptr1: %p, ptr2: %p, ptr3: %p\n", ptr1, ptr2, ptr3);
+
+    customFree(ptr2);
+
+    char* ptr4 = (char*)customMalloc(25);
+
+    printf("ptr4: %p\n", ptr4);
+
+    customFree(ptr1);
+
+    printf("Freed ptr1\n");
+
+    customFree(ptr3);
+
+    printf("Freed ptr3\n");
+
+    customFree(ptr4);
+
+    printf("Freed ptr4\n");
+
+    printf("End of Test 2\n");
+
+
+
+}
+
+
+
+int main() {
+
+    printf("hello\n");
+
+    heapCreate();
+
+    //test1();
+
+    test2();
+
+    //test3();
+
+    //testCalloc();
+
+    //testRealloc();
+
+    heapKill();
+
+    return 0;
+
+}
+
+This output confirms exactly what we suspected: The allocator thinks the empty space at the very end of the heap is a valid "free block" and tries to reuse it without allocating more memory.
+
+1. The Evidence in Your Output
+Look at this sequence of events in your logs:
+
+Before malloc(40):
+
+Program Break: 0x21d0064
+
+During malloc(40):
+
+found best fit: true (This is the error! There is no free block, just empty space).
+
+The Resulting Pointer (ptr3):
+
+ptr3: 0x21d007c
+
+If we subtract the header size (24 bytes) from ptr3:
+
+0x21d007c−0x18=0x21d0064
+This matches the Program Break exactly!
+
+The Conclusion: Your allocator wrote the new header exactly at the Program Break boundary and returned a pointer to the memory after it. But since findBestFit returned true, your code skipped the sbrk call. You are effectively writing to and using unallocated memory (the "wilderness" beyond the heap).
+
+2. The Bug Location
+The issue is inside followingFreeBlockSize. You calculate the "gap" after the last block as: size_t programBreak = (size_t)sbrk(0); return programBreak - blockEnd;
+
+Even if this result is 0 (or huge due to underflow), conceptually this is not a free block. This is the end of the world. You cannot "fit" data here; you must extend the world (call sbrk) to use it.
+
+3. The Fix
+Change the logic to explicitly return 0 (no gap) if you are at the last block. This forces findBestFit to fail, which in turn forces customMalloc to call sbrk.
+
+Replace your followingFreeBlockSize with this:
+
+C
+size_t followingFreeBlockSize(Header* header){
+    if(header == NULL){
+        return 0;
+    }
+    size_t blockEnd = (size_t)endOfBlock(header);
+    
+    // FIX: If we are at the last block, there is NO "free block" after us.
+    // The space after us is unmapped memory. Return 0 to force sbrk expansion.
+    if(header->next == NULL){
+        return 0; 
+    }
+    
+    return ((size_t)header->next - blockEnd);
+}
+4. Why did it return true (Logic Check)?
+You might wonder: "If the gap was 0, and I needed 64 bytes, why did 0 >= 64 return true?"
+
+It is highly likely that Integer Underflow occurred.
+
+If sbrk(0) was even 1 byte smaller than blockEnd (perhaps due to a previous unaligned sbrk or header calculation), the subtraction (size_t)small - (size_t)big wraps around to a massive positive number.
+
+findBestFit sees this massive number, thinks "Wow, plenty of space!", and returns true.
+
+By applying the fix above, you avoid this math entirely.
+
+Next Step: Apply this fix and run test2 again. You should see found best fit: false for the third allocation, and the Program Break should increase. Would you like to proceed to the Part B (Multithreading) setup now?
+
+whar is %zu printf type
+
+%zu is the format specifier used in printf specifically for variables of type size_t.
+
+Why do we need it?
+
+size_t is an unsigned integer type, but its size changes depending on your system architecture:
+
+On 32-bit systems: size_t is usually 4 bytes (like unsigned int).
+
+On 64-bit systems: size_t is usually 8 bytes (like unsigned long).
+
+If you try to print a size_t using %u (for unsigned int) or %lu (for unsigned long), your code becomes non-portable:
+
+Using %u on a 64-bit system might truncate the value (printing garbage for large numbers).
+
+Using %lu on a 32-bit system might expect more bytes than provided, leading to stack corruption or wrong output.
+
+%zu solves this by telling printf: "I am providing a size_t; please adjust yourself to whatever size that happens to be on this machine."
+
+Example
+C
+size_t mySize = sizeof(int);
+printf("Size of int: %zu bytes\n", mySize);
+
+Note: Since your assignment flags include -std=c99, using %zu is perfectly standard and correct.
+
+Next Step: Are you ready to start implementing the struct for the memory regions and the mutex logic for Part B?
+
+in git merge conflict window we have edit abort recover delete explain each
+
+In the context of resolving a git merge conflict, these commands represent the primary actions you can take to manage the conflicting state of your branch.
+
+1. Edit
+Selecting Edit (often labeled as "Resolve in Merge Editor") opens the conflicting file to allow for manual intervention. You will see markers indicating the differences between the current branch (Ours) and the branch being merged (Theirs).
+
+Goal: Manually combine the best parts of both changes.
+
+Action: You delete the conflict markers and the code you don't want, then save the file.
+
+2. Abort
+The Abort command acts as an "undo" button for the entire merge process.
+
+Goal: Return the repository to the state it was in before you ran git merge.
+
+Effect: It cleans up the merge markers and stops the merge attempt entirely. This is useful if the conflict is too complex to solve immediately or if you realized you merged the wrong branch.
+
+3. Recover
+Recover is a less common standard Git term but is frequently found in IDEs like VS Code or IntelliJ.
+
+Goal: It usually refers to restoring a file to a previous "known good" state from a local history or cache if the merge resolution goes wrong and you lose code.
+
+Action: It helps you get back to a state where you can try the resolution again without aborting the entire merge.
+
+4. Delete
+The Delete action (sometimes "Remove File") is used when the conflict arises because one branch modified a file while the other branch deleted it.
+
+Goal: Confirm that the file should indeed be removed from the project.
+
+Effect: The file is staged for removal, and the conflict is resolved by choosing "the deletion" as the winner.
+
+Summary Table
+Action	Result
+Edit	You manually fix the code.
+Abort	The merge stops; everything goes back to normal.
+Recover	Restores a file from local history/cache.
+Delete	The file is permanently removed from the branch.
+Would you like me to show you the specific shell commands (like git merge --abort) that correspond to these UI buttons?
+
+why in our logc would end block be bigger than PB how is that possible?
+
+
+
+#include "customAllocator.h"
+
+
+
+//----------- in data memory space --------------------//
+
+static void* heapStart = NULL;
+
+static Header* headerList = NULL; // Your sorted list head
+
+static Header* headerListTail = NULL; // Your sorted list tail
+
+
+
+// for multi-threaded allocator
+
+static pthread_mutex_t counterMutex = PTHREAD_MUTEX_INITIALIZER;
+
+//static int counter = 0;
+
+
+
+//------------------------------------------------//
+
+
+
+/*=============================================================================
+
+helper functions
+
+=============================================================================*/
+
+void heapCreate(){
+
+    heapStart = sbrk(0);
+
+
+
+    //part B
+
+    pthread_mutex_init(&counterMutex, NULL);
+
+    for(int i = 0; i < INITIAL_REGION_NUM; i++){
+
+       
+
+    }
+
+}
+
+void heapKill(){
+
+    brk(heapStart); //reset brk to initial state
+
+}
+
+
+
+void addHeaderToList(Header* newHeader, Header* predecessorHeader){
+
+    if(headerList == NULL){
+
+        headerList = newHeader;
+
+        newHeader->prev = NULL;
+
+        newHeader->next = NULL;
+
+        headerListTail = newHeader;
+
+    } else if(predecessorHeader == NULL){
+
+        //we add to the beginning of the list
+
+        newHeader->next = headerList;
+
+        newHeader->prev = NULL;
+
+        headerList->prev = newHeader;
+
+        headerList = newHeader;
+
+    } else {
+
+        //we get a predecessor header
+
+        newHeader->next = predecessorHeader->next;
+
+        newHeader->prev = predecessorHeader;
+
+        predecessorHeader->next = newHeader;
+
+        if(newHeader->next == NULL){
+
+            headerListTail = newHeader;
+
+        } else{
+
+            newHeader->next->prev = newHeader;
+
+        }
+
+    }
+
+}
+
+
+
+void removeHeaderFromList(Header* header){
+
+    if(header->prev != NULL){
+
+        header->prev->next = header->next;
+
+    } else {
+
+        headerList = header->next;
+
+    }
+
+    if(header == headerListTail){
+
+        headerListTail = header->prev;
+
+    } else {
+
+        header->next->prev = header->prev;
+
+    }
+
+}
+
+
+
+//recives size includng the header size
+
+bool findBestFit(size_t neededSize, Header** predecessortoBestFit){
+
+
+
+    //first find the gap between heapStart and first header
+
+    size_t bestFitSize = (size_t)(-1);
+
+    size_t gap_size = 0;
+
+    if(headerList == NULL){
+
+        gap_size = (size_t)sbrk(0) - (size_t)heapStart;
+
+        if(gap_size >= neededSize){
+
+            *predecessortoBestFit = NULL;
+
+            return true;
+
+        } else {
+
+            return false;
+
+        }
+
+    }
+
+    //check first gap
+
+    //if first gap is best fit, set predecessor to NULL and return true
+
+    gap_size = (size_t)headerList - (size_t)heapStart;
+
+    if(gap_size >= neededSize){
+
+        bestFitSize = gap_size;
+
+        *predecessortoBestFit = NULL;
+
+    }
+
+
+
+    Header* current = headerList;
+
+    while(current != NULL){
+
+        gap_size = followingFreeBlockSize(current);
+
+        if(gap_size >= neededSize && gap_size < bestFitSize){
+
+            bestFitSize = gap_size;
+
+            *predecessortoBestFit = current;
+
+        }
+
+        current = current->next;
+
+    }
+
+    if(bestFitSize != (size_t)(-1)){
+
+        return true;
+
+    } else {
+
+        return false;
+
+    }
+
+
+
+}
+
+
+
+size_t followingFreeBlockSize(Header* header){
+
+    if(header == NULL ){
+
+        return 0;
+
+    }
+
+    size_t blockEnd = (size_t)endOfBlock(header);
+
+    if(header->next == NULL){
+
+        size_t programBreak = (size_t)sbrk(0);
+
+        return programBreak - blockEnd;
+
+    }
+
+    return ((size_t)header->next - blockEnd);
+
+}
+
+
+
+void* endOfBlock(Header* header){
+
+    return (void*)((size_t)header + sizeof(Header) + header->size);
+
+}
+
+
+
+void outOfMemHandler(){
+
+    brk(heapStart); //reset brk to initial state
+
+    printf("<sbrk/brk error>: out of memory\n");
+
+    exit(1);
+
+}
+
+
+
+
+
+
+
+
+
+/*=============================================================================
+
+PART A
+
+=============================================================================*/
+
+
+
+
+
+void* customMalloc(size_t size){
+
+    if(size == 0){
+
+        return NULL;
+
+    }
+
+    size = ALIGN_TO_MULT_OF_4(size);
+
+    size_t neededSize = size + sizeof(Header);
+
+    Header* predecessorHeader = NULL;
+
+    void* startHeader = NULL;
+
+    bool found_free_block = findBestFit(neededSize, &predecessorHeader);
+
+    printf("found best fit: %s\n", found_free_block ? "true" : "false");
+
+    if(!found_free_block){
+
+        //no free block, raise program break
+
+        startHeader = sbrk(neededSize);
+
+        if(startHeader == SBRK_FAIL){
+
+            if(errno == ENOMEM){
+
+                outOfMemHandler();
+
+            } else {
+
+                printf("<sbrk error>: bad sbrk args\n");
+
+                return NULL;
+
+            }
+
+        }
+
+    }
+
+    else {
+
+        //found free block
+
+        if(predecessorHeader == NULL){
+
+            //free block is at the beginning of the heap
+
+            startHeader = heapStart;
+
+        } else {
+
+            //free block is after predecessorHeader
+
+            startHeader = endOfBlock(predecessorHeader);
+
+        }
+
+    }
+
+
+
+    Header* allocatedHeader = (Header*)startHeader;
+
+    //set header info
+
+    allocatedHeader->size = size;
+
+    //add to header list
+
+    addHeaderToList(allocatedHeader, predecessorHeader);
+
+    //return pointer to memory after header
+
+    printMemState();
+
+    return (void*)((size_t)allocatedHeader + sizeof(Header));
+
+}
+
+
+
+void customFree(void* ptr){
+
+    if(ptr == NULL){
+
+        printMemState();
+
+        return;
+
+    }
+
+    if((size_t)ptr < (size_t)heapStart || (size_t)ptr >= (size_t)sbrk(0)){
+
+        printf("<free error>: passed non-heap pointer\n");
+
+        printMemState();
+
+        return;
+
+    }
+
+    Header* headerToFree = (Header*)((size_t)ptr - sizeof(Header));
+
+    removeHeaderFromList(headerToFree);
+
+    int err;
+
+    if(endOfBlock(headerToFree) == sbrk(0)){
+
+        if(headerListTail == NULL){
+
+            err = brk(heapStart); //shrink heap to initial state
+
+        } else{
+
+            err = brk(endOfBlock(headerListTail)); //shrink heap to last allocated block
+
+        }
+
+        if(err == BRK_FAIL){
+
+            if(errno == ENOMEM){
+
+                outOfMemHandler();
+
+            } else {
+
+                printf("<brk error>: bad brk args\n");
+
+            }
+
+            printMemState();
+
+            return;
+
+        }
+
+    }
+
+    printMemState();
+
+}
+
+
+
+void* customCalloc(size_t nmemb, size_t size){
+
+    size_t totalSize = ALIGN_TO_MULT_OF_4(nmemb * size);
+
+    void* allocatedPtr = customMalloc(totalSize);
+
+    if(allocatedPtr == NULL){
+
+        return NULL;
+
+    }
+
+    //initialize memory to zero
+
+    memset(allocatedPtr, 0, totalSize);
+
+    return allocatedPtr;
+
+}
+
+
+
+void* customRealloc(void* ptr, size_t size){
+
+    if(ptr == NULL){
+
+        return customMalloc(size);
+
+    }
+
+    if((size_t)ptr < (size_t)heapStart || (size_t)ptr >= (size_t)sbrk(0)){
+
+        printf("<realloc error>: passed non-heap pointer\n");
+
+        return NULL;
+
+    }
+
+    if(size == 0){
+
+        customFree(ptr);
+
+        return NULL;
+
+    }
+
+    size = ALIGN_TO_MULT_OF_4(size); // align size to multiple of 4
+
+    Header* currentHeader = (Header*)((size_t)ptr - sizeof(Header));
+
+    if(currentHeader->size >= size){
+
+        if(endOfBlock(currentHeader) == sbrk(0)){
+
+            currentHeader->size = size;
+
+            int err = brk(endOfBlock(currentHeader));
+
+            if(err == BRK_FAIL){
+
+                if(errno == ENOMEM){
+
+                    outOfMemHandler();
+
+                } else {
+
+                    printf("<brk error>: bad brk args\n");
+
+                    return NULL;
+
+                }
+
+            }
+
+        } else {
+
+            currentHeader->size = size;
+
+        }
+
+        return ptr;
+
+    } else {
+
+        void* newPtr = customMalloc(size);
+
+        if(newPtr == NULL){
+
+            return NULL;
+
+        }
+
+        //copy old data to new block
+
+        memcpy(newPtr, ptr, currentHeader->size);
+
+        customFree(ptr);
+
+        return newPtr;
+
+    }
+
+    printMemState();
+
+   
+
+}
+
+
+
+/*=============================================================================
+
+PART A JOVER
+
+=============================================================================*/
+
+
+
+/*=============================================================================
+
+PART B
+
+=============================================================================*/
+
+
+
+
+
+/*=============================================================================
+
+DEBUG FUNCTIONS
+
+=============================================================================*/
+
+
+
+void printMemState(){
+
+    printf("\n\n\n-------- Memory State --------\n");
+
+    printf("Heap Start: %p\n", heapStart);
+
+    printf("Program Break: %p\n", sbrk(0));
+
+    //Header* current = headerList;
+
+    //int index = 0;
+
+    // while(current != NULL){
+
+    //     printf("Block %d: Header at %p, Size: %zu, End: %p\n", index, (void*)current, current->size, endOfBlock(current));
+
+    //     index++;
+
+    //     current = current->next;
+
+    // }
+
+    printf("-------- End of Memory State --------\n\n\n\n");
+
+}
+
+Under normal, bug-free execution, it is impossible for a valid allocated block's end address to be strictly greater than the Program Break (PB).
+
+The Program Break is, by definition, the "end of the valid heap world." Nothing exists beyond it.
+
+However, we include checks like ptr >= sbrk(0) or worry about this scenario for three specific reasons:
+
+1. Catching User Errors (Sanity Check)
+The check in your customFree and customRealloc:
+
+C
+if((size_t)ptr >= (size_t)sbrk(0)) { ... }
+This is not there because we might place a block there. It is there because the user might pass a garbage pointer.
+
+Example: A user tries to free a variable allocated on the Stack. Stack addresses are usually much higher than Heap addresses (often exceeding sbrk(0)).
+
+Example: A user tries to free a pointer that they already freed, and since then, the heap has shrunk (via brk). That old pointer now points to "unmapped memory" above the new PB.
+
+2. Heap Corruption (Buffer Overflow)
+This is a common disaster scenario.
+
+Imagine you have Block A. The user writes past the end of Block A's payload.
+
+They overwrite the header of Block B, changing its size from 100 to 1,000,000.
+
+Now, when you calculate endOfBlock(B), the math says it ends way past sbrk(0).
+
+If your logic detects this (e.g., end > sbrk(0)), it's a sign that the heap metadata has been corrupted by a buffer overflow.
+
+3. The "Exact Match" vs. "Greater Than"
+Valid: endOfBlock(block) == sbrk(0)
+
+This is perfectly fine. It means this is the last block in the heap. It fills the space exactly up to the limit.
+
+Invalid: endOfBlock(block) > sbrk(0)
+
+This implies the block claims to own memory that the OS hasn't given us. This is always a bug or corruption.
+
+Summary
+In your logic, endOfBlock being bigger than PB is impossible if the heap is healthy. The checks exist solely to defend your allocator against bad users passing invalid pointers or corrupted memory states.
+
+will a size_t cast of -1 be the maximum size_t value?
+
+Yes, absolutely.
+
+Casting -1 to size_t (which is an unsigned type) guarantees the resulting value is the maximum possible integer for that type.
+
+Here is why:
+
+Unsigned Wrap-Around: In C, unsigned arithmetic is defined to wrap around using modulo 
+2 
+N
+ 
+ (where 
+N
+ is the number of bits).
+
+−1(mod2 
+N
+ )=2 
+N
+ −1
+This value (
+2 
+N
+ −1
+) is the largest number an 
+N
+-bit unsigned integer can hold.
+
+Bit Representation: In Two's Complement (used by almost all modern computers), -1 is represented as all ones (e.g., 1111...1111).
+
+As a signed int, this means -1.
+
+As an unsigned size_t, "all ones" means the Maximum Value.
+
+Why this is good for your code
+In your findBestFit function:
+
+C
+size_t bestFitSize = (size_t)(-1);
+This is a standard, robust C idiom. It initializes your "best so far" variable to SIZE_MAX. This ensures that any valid block size you find in the heap (which must be smaller than the total memory) will be smaller than this initial value, guaranteeing your logic updates correctly on the first match.
+
+ok do you remember the instruction of alignment to 4?
+
+i want to ask what is the logical understanding according to real life calloc use
+
+is it logical to do like in our code:
+
+
+
+void* customCalloc(size_t nmemb, size_t size){
+
+    size_t totalSize = ALIGN_TO_MULT_OF_4(nmemb * size);
+
+    void* allocatedPtr = customMalloc(totalSize);
+
+    if(allocatedPtr == NULL){
+
+        return NULL;
+
+    }
+
+    //initialize memory to zero
+
+    memset(allocatedPtr, 0, totalSize);
+
+    return allocatedPtr;
+
+}
+
+
+
+alignment of the total block, or is it more logical to align each of the "members"
+
+Based on "real life" logic and the C standard, it is correct to align the total, not the individual members.
+
+Your current implementation is the logical one:
+
+C
+size_t totalSize = ALIGN_TO_MULT_OF_4(nmemb * size);
+Here is the breakdown of why aligning "each member" would actually be wrong and why your approach is correct.
+
+1. The Logic: Arrays are "Packed"
+The definition of calloc(n, size) is that it allocates a contiguous array of n objects. In C, arrays are packed tightly. There is no "padding" inserted between elements by the allocator.
+
+Example Scenario: Imagine a user does: customCalloc(2, 3) (2 items, 3 bytes each).
+
+Real Life Expectation (Your Code):
+
+Total needed: 
+2×3=6
+ bytes.
+
+Allocator aligns 6 
+→
+ 8 bytes (to satisfy the 4-byte heap rule).
+
+Result: A block of 8 bytes.
+
+User's view:
+
+Item 0: Bytes 0-2
+
+Item 1: Bytes 3-5
+
+Padding (Unused): Bytes 6-7 (just to keep heap happy)
+
+The "Align Each Member" Mistake:
+
+If you aligned before multiplying: ALIGN(3) = 4.
+
+Total: 
+2×4=8
+ bytes.
+
+The Problem: The user's pointer arithmetic does not know you added padding!
+
+If the user casts this to a char* or a packed struct pointer, they expect Item 1 to start at Offset 3. If you intended Item 1 to start at Offset 4, you have broken the array logic.
+
+2. Why your code is safe
+The allocator's job is only to ensure the entire block fits the heap's alignment rules (start and end on a 4-byte boundary). It does not care about the alignment of the data inside the block.
+
+Your Code: size_t totalSize = ALIGN_TO_MULT_OF_4(nmemb * size); This ensures that you request a block size that is safe for your customMalloc and sbrk logic.
+
+3. A Minor Optimization
+Since your customMalloc already performs ALIGN_TO_MULT_OF_4(size) at the very first line, you technically don't strictly need to do it inside customCalloc.
+
+However, doing it in customCalloc is actually better practice for one reason: memset.
+
+By aligning it here, your totalSize variable accurately reflects the full 4-byte aligned block size.
+
+Your memset(allocatedPtr, 0, totalSize) will therefore zero out the padding bytes at the end of the block too.
+
+If you didn't align it here, you would memset only the payload (e.g., 6 bytes), leaving the last 2 padding bytes as garbage (uninitialized). While not strictly a bug (the user shouldn't read them), zeroing them is cleaner "calloc" behavior.
+
+Conclusion
+Keep your logic exactly as it is. Aligning the total sum is the correct way to emulate standard calloc.
+
+i'd like to use valgrid and forgot the command
+
+The standard command to run Valgrind with the most useful flags for debugging memory errors (like the ones we found earlier) is:
+
+Bash
+valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes -s ./your_program_name
+Breakdown of flags:
+--leak-check=full: Shows the details of each individual memory leak, not just a summary.
+
+--show-leak-kinds=all: Reports all types of leaks (definite, indirect, possible, reachable).
+
+--track-origins=yes: Critical for you. This tracks down exactly where uninitialized values were created (like the heapStart or bestFitSize bug we suspected earlier). It makes the tool slower but gives you the exact line number of the error.
+
+-s: Prints a summary of errors to the console (useful if you don't want to dig through a log file).
+
+./your_program_name: The executable you compiled (e.g., ./tests or ./a.out).
+
+Important Reminder
+To get meaningful line numbers in the Valgrind report, you must compile your code with the debug flag -g:
+
+Bash
+gcc -g -std=c99 -Wall -pedantic-errors customAllocator.c tests.c -o tests
+rs -pthread -DNDEBUG *.c -o main
+
+os@os:~/Documents/OperatingSystems$ valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes -s ./main
+
+valgrind: Unknown option: -s
+
+valgrind: Use --help for more information or consult the user manual.
+
+It seems you are running a slightly older version of Valgrind that does not support the -s (summary) shorthand flag.
+
+The fix is simply to remove the -s. The output will still print to the console by default.
+
+Run this command instead:
+
+Bash
+valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./main
+Tip: If you find the output is too long to read in the terminal, you can save it to a file to inspect later:
+
+Bash
+valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --log-file=valgrind-out.txt ./main
+is valgrind a good tool to test my code, it was a bit sus that it says all is perfect, now i intetionaly do not free stuff, and printed sbrk(0) at the end to be sure i do not return pb to the heapstart and still it doesnt ditect a problem:
+
+
+
+end of prints in run:
+
+-------- Memory State --------
+
+Heap Start: 0x4228000
+
+Program Break: 0x4230280
+
+Block 0: Header at 0x4228000, Size: 100, End: 0x422807c
+
+Block 1: Header at 0x4228874, Size: 80, End: 0x42288dc
+
+Block 2: Header at 0x422893c, Size: 52, End: 0x4228988
+
+Block 3: Header at 0x4228988, Size: 20, End: 0x42289b4
+
+Block 4: Header at 0x42289dc, Size: 32, End: 0x4228a14
+
+-------- End of Memory State --------
+
+
+
+
+
+
+
+End of Test Realloc
+
+sbrk 0x4230280==3859== 
+
+==3859== HEAP SUMMARY:
+
+==3859==     in use at exit: 0 bytes in 0 blocks
+
+==3859==   total heap usage: 1 allocs, 1 frees, 1,024 bytes allocated
+
+==3859== 
+
+==3859== All heap blocks were freed -- no leaks are possible
+
+==3859== 
+
+==3859== For counts of detected and suppressed errors, rerun with: -v
+
+==3859== ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)
+
+This is a classic "gotcha" when writing a custom memory allocator. Your suspicion is 100% correct: Valgrind is effectively "blind" to your custom allocator.
+
+Here is exactly why Valgrind is reporting "All perfect" despite your intentional leaks, and how you should actually test your code.
+
+1. The "Smoking Gun" in the Logs
+Look closely at this line in your Valgrind output:
+
+Plaintext
+==3859==    total heap usage: 1 allocs, 1 frees, 1,024 bytes allocated
+You clearly allocated 5 blocks (Block 0 to Block 4 in your logs), yet Valgrind only saw 1 allocation.
+
+That single allocation likely came from an internal C library function (like printf initializing a buffer).
+
+Valgrind did not count any of your customMalloc calls.
+
+2. Why is Valgrind blind?
+Valgrind's Memcheck tool works by "wrapping" (intercepting) the standard library functions: malloc, free, calloc, and realloc.
+
+Standard Program: User calls malloc 
+→
+ Valgrind intercepts it 
+→
+ Valgrind records "1 block allocated" 
+→
+ Valgrind calls real malloc.
+
+Your Program: User calls customMalloc 
+→
+ Valgrind ignores it (it's just a user function) 
+→
+ Your function calls sbrk.
+
+To Valgrind, sbrk is just a system call that moves a memory boundary. It doesn't know that the memory inside that boundary is divided into "blocks" or that you intended to free them. It assumes you are managing a custom memory pool and know what you are doing.
+
+3. How to actually test your Allocator
+Since you cannot rely on Valgrind's leak detector for your custom logic (unless you add complex "Client Request" annotations to your code), you must rely on Internal Accounting.
+
+The Correct Test: Your manual verification method is the right one.
+
+Start: Save sbrk(0) to a variable (e.g., startBrk).
+
+Run Test: Do a bunch of customMalloc and customFree.
+
+Cleanup: Free everything you expect to be freed.
+
+End: Check sbrk(0) again.
+
+Pass: sbrk(0) == startBrk (The heap has fully shrunk back).
+
+Fail: sbrk(0) > startBrk (You still have memory mapped).
+
+Summary
+Valgrind is useless for leak checking your custom allocator logic (because it only watches the standard malloc).
+
+Valgrind IS useful for memory errors (like accessing uninitialized memory or reading past the end of a block), but only if you haven't replaced the standard malloc entirely, or if you manually "poison" memory areas.
+
+Trust your debug prints. Your logs show Program Break: 0x4230280 is much larger than Heap Start: 0x4228000. That confirms your intentional leak is real, and your "manual" test successfully caught what Valgrind missed.
+
+i still would like to use valgrind for checking the MT stuff, what is the valgrind MT flag?
+
+To check for multithreading errors (like race conditions and deadlocks), you cannot use the standard Memcheck tool. You need to switch Valgrind's "tool" entirely.
+
+The industry-standard tool for this is Helgrind.
+
+The Command
+Bash
+valgrind --tool=helgrind --history-level=full ./main
+Breakdown of Flags
+--tool=helgrind: Switches Valgrind from the default memory checker to the thread error detector.
+
+--history-level=full: (Highly Recommended) When a race condition is found, this flag ensures Valgrind prints the full stack trace of both conflicting threads (the one reading and the one writing). Without this, you only see "conflicting access" but not who caused it.
+
+What Helgrind Detects
+Data Races: Two threads accessing the same memory location without a lock (and at least one is writing).
+
+Example: Thread A reads counter while Thread B increments counter.
+
+Lock Order Violations (Potential Deadlocks): Thread A locks M1 then M2, while Thread B locks M2 then M1.
+
+API Misuse: Unlocking a mutex you don't own, destroying a locked mutex, etc.
+
+Alternative Tool: DRD
+If Helgrind is too slow or reports too many errors, you can try DRD. It is lighter but sometimes misses edge cases.
+
+Bash
+valgrind --tool=drd ./main
+Important Prerequisite
+Make sure you compile with both debug info and the pthread library linked:
+
+Bash
+gcc -g -pthread -std=c99 ...
+what other tools might be relevant for MT or memory managment?
+
+Beyond Valgrind (Helgrind/DRD), there are three other powerful categories of tools that are standard for debugging multithreading and memory management in C.
+
+1. The Compiler Sanitizers (The "Modern Standard")
+Modern GCC and Clang compilers have built-in "Sanitizers". These are often faster and more accurate than Valgrind because they instrument the code at compile time rather than running it in a virtual machine.
+
+A. ThreadSanitizer (TSan) This is arguably the best tool for Part B of your assignment. It detects data races (accessing memory without a lock) and deadlocks.
+
+How to use: Add -fsanitize=thread to your compile flags.
+
+Bash
+gcc -g -pthread -fsanitize=thread -std=c99 customAllocator.c tests.c -o tests
+Run: Just run the executable normally: ./tests
+
+Why use it? It gives extremely readable error reports showing exactly which two lines of code raced against each other.
+
+Note: You cannot use TSan and Valgrind at the same time.
+
+B. AddressSanitizer (ASan) Great for detecting out-of-bounds accesses and use-after-free errors.
+
+How to use: -fsanitize=address
+
+Limitation: Like Valgrind, ASan mostly tracks standard malloc. However, it is excellent for checking if your test code (the user of the allocator) is behaving correctly.
+
+2. GDB (The "Surgeon")
+When your threaded program hangs (deadlock) or crashes (segfault), GDB is the only way to inspect the "frozen" state.
+
+Key Multithreading Commands:
+
+info threads: Lists all currently running threads and where they are stuck.
+
+thread apply all bt: Prints a "Back Trace" for every thread. This is the #1 way to spot a deadlock (e.g., Thread 1 waiting for Mutex A, Thread 2 waiting for Mutex B).
+
+set scheduler-locking on: Forces GDB to run only the current thread while pausing others. This allows you to step through one thread's logic without another thread interfering.
+
+3. Strace (The "Spy")
+Since your assignment relies on sbrk and brk (system calls), strace is invaluable. It prints every system call your program makes to the kernel.
+
+How to use:
+
+Bash
+strace ./main
+Or filter only for memory calls:
+
+Bash
+strace -e trace=brk,sbrk,mmap,munmap ./main
+Why use it?
+
+It proves definitively whether your allocator is actually asking the OS for memory or if it's just recycling internal blocks.
+
+If you see brk(0x...) = 0x... followed by exit_group(1), you know exactly when and why your program crashed or exited.
+
+Summary Recommendation
+Development: Use ThreadSanitizer (-fsanitize=thread) while coding Part B. It catches races instantly.
+
+Debugging Hangs: Use GDB (info threads) if the program freezes.
+
+Verification: Use Strace to ensure your sbrk calls match your expectations.
+
+is this ok for tsan?
+
+os@os:~/Documents/OperatingSystems$ gcc -g -std=c99 -Wall -Werror -pedantic-errors -pthread -fsanitize=thread -DNDEBUG *.c -o main
+
+Yes, that command is perfectly valid and correct for enabling ThreadSanitizer.
+
+Here is a quick breakdown of why this works:
+
+-fsanitize=thread: This is the critical flag. By passing it to both the compiler and the linker (which happens automatically when you do it all in one line), you instruct GCC to instrument memory accesses and linking the TSan library.
+
+-g: Essential. Without this, TSan would tell you there is a race, but it wouldn't be able to tell you which line number in your C file caused it.
+
+-pthread: Essential. TSan needs to hook into the pthread library to understand when threads are created and joined.
+
+One Small Warning: -DNDEBUG
+You included the flag -DNDEBUG.
+
+What it does: It disables the assert() macro.
+
+The Risk: If you wrote code like assert(ptr != NULL) to catch bugs, those checks will now be ignored.
+
+Recommendation: For debugging/testing sessions, you usually want to remove -DNDEBUG so your assertions still fire. Put it back only when you are measuring final performance or submitting.
+
+How to use it
+Since TSan checks occur at runtime, you don't need to do anything else. Just run your program:
+
+Bash
+./main
+If a race condition occurs, TSan will interrupt your output with a detailed error report.
+
+nice in another topic, i need to submit a log of our entire chat, what is a nice clean way for me to do it, is there some online tool/
+
+Since you are submitting this for a university assignment (and our chat is full of C code), you want a method that preserves syntax highlighting and indentation.
+
+Here are the three best ways to do it, ordered from "cleanest" to "easiest."
+
+1. The "Developer" Way (Best for Code)
+Since you are likely already using VS Code for your assignment, this is the best method to keep the code blocks readable.
+
+Copy the entire conversation.
+
+Create a new file in VS Code named chat_log.md (Markdown).
+
+Paste the chat into it.
+
+Open the Preview pane (Press Ctrl + Shift + V or click the "Open Preview to the Side" icon).
+
+Right-click anywhere on the preview and select Print (or Chrome: Print).
+
+Select Save as PDF.
+
+Why this is best: It renders the code blocks with colors and proper wrapping, looking exactly like documentation.
+
+2. The Native "Share" Link (If allowed)
+If your submission box allows URL links, Gemini has a built-in feature for this.
+
+Click the Share icon (usually top right or near the chat title).
+
+Select Create public link.
+
+Copy the URL.
+
+Pros: It looks exactly like the interface you see now.
+
+Cons: Verify your professor accepts links instead of files.
+
+3. Browser Print (Quickest File)
+If you don't want to format it manually:
+
+Press Ctrl + P (Cmd + P on Mac) in your browser.
+
+Destination: Save as PDF.
+
+Crucial Setting: Look for "More Settings" -> "Options" -> Check "Background graphics".
+
+Note: Without checking "Background graphics", the grey boxes behind code blocks will disappear, making the code hard to read against the white background.
+
+Recommendation: Go with Option 1 (VS Code). It looks professional and ensures your C code snippets remain easy to read for the grader.
+
+when you say copy all you mean control A because it copies the side chats as well and stuff
+
+No, you are absolutely right—Ctrl + A is messy because it grabs the sidebar, the input box, and the buttons.
+
+Here is the cleaner way to copy just our conversation:
+
+Method 1: The "Click and Drag" (Most Reliable)
+Scroll up to the very first message in this chat.
+
+Click and hold your mouse cursor at the start of the text.
+
+Drag your mouse all the way down to the bottom of the last message.
+
+Copy (Ctrl + C) and paste that into your Markdown/Word file.
+
+Method 2: The "Export" Feature (If available)
+If you see the three vertical dots (menu icon) next to this specific chat in your sidebar history or at the top of the page:
+
+Click the menu.
+
+Look for an option like "Export to Docs" or "Copy text".
+
+Note: This feature varies by account/region. If you don't see it, stick to Method 1.
+
+Method 3: The "Reader View" Hack
+If you are using a browser like Safari or Firefox (or Chrome with a Reader extension):
+
+Enter Reader View (often an icon in the address bar that looks like a page of text).
+
+This strips away the sidebars and buttons automatically.
+
+Now you can press Ctrl + A safely, as only the chat text remains visible.
+
+Recommendation: Just use Method 1. It takes 10 seconds and guarantees you only get the text you want. Paste it into VS Code, save as .md or .pdf, and you are done!
+
+we relized there is a case in which we do not destroy some mutexes but we get no error in the end of the program, may is be because we end by brk(heapstart) so we free the memory space in which the mutexes were initilized?
+
+what does mutex init do? pls explain
+
+Your intuition is spot on.
+
+The reason you see no error is that standard C runtimes are "passive." They do not strictly police whether you clean up every single object before you quit or free memory.
+
+Here is the breakdown of why this happens and what mutex_init actually does under the hood.
+
+1. What does pthread_mutex_init actually do?
+When you call pthread_mutex_init(&myMutex, NULL), you are essentially telling the system: "Please set up the memory at this address to act as a lock."
+
+It does two main things:
+
+Sets Internal Variables: It writes specific values into the pthread_mutex_t struct (which resides in your heap or static memory). It sets flags like "unlocked", "no owner", and "default protocol".
+
+Prepares for Kernel Interaction (Futex): On Linux, mutexes use a mechanism called a Futex (Fast Userspace Mutex). Most of the work happens in user-space memory (checking if the variable is 0 or 1). The kernel is only involved if there is contention (waiting).
+
+Crucially: pthread_mutex_init usually does not allocate new heap memory itself. It just initializes the data structure you provided.
+
+2. Why brk(heapStart) "hides" the crime
+When you call brk(heapStart), you are telling the Operating System: "I am done with all this memory. You can take it back."
+
+The OS moves the Program Break pointer back to the start.
+
+The memory where your mutexes lived is now effectively "unmapped" or marked as invalid for your process.
+
+The "mutex" concept vanishes because the physical bytes that represented it are gone.
+
+The system does not scan that memory before freeing it to say, "Hey, wait! There is an active mutex at address 0x1234!" It just blindly reclaims the pages. Since the memory is gone, the mutex is gone. If no other thread tries to touch it after the brk, no error occurs.
+
+3. Is this bad?
+Technically, yes, it is bad practice, even if it doesn't crash.
+
+Resource Leaks: While simple mutexes on Linux are mostly just memory, some advanced mutex types (or on other OSes) might allocate internal kernel resources (handles) that need explicit destruction. If you just free the memory without calling destroy, those kernel handles might leak (until the process terminates).
+
+Undefined Behavior: The POSIX standard says that freeing the memory underlying a mutex without destroying it first is Undefined Behavior.
+
+Debug Tools: If you run this with Valgrind or Helgrind, they will scream at you. They track every initialized mutex and will report "Mutex destruction missing" or similar errors.
+
+Summary
+You didn't get an error because C assumes you know what you are doing. By nuking the heap with brk, you destroyed the evidence before the system could complain.
+
+Next Step: Would you like to know how to iterate through your block list to properly destroy the mutexes inside your headers before calling heapKill?
+
+what does pthread mutex destroy does
+
+pthread_mutex_destroy is the cleanup function for a mutex. Think of it as the "shutdown procedure" for that specific lock.
+
+Here is exactly what it does, and why it might seem like it "does nothing" in simple cases.
+
+1. It Invalidates the Object
+The primary job of destroy is to mark the mutex object as invalid.
+
+It often writes a specific "garbage" value into the mutex structure.
+
+If you try to lock or unlock this mutex after destroying it, the program will crash or return an error (instead of deadlocking or behaving unpredictably). This is a safety mechanism.
+
+2. It Checks for "Busy" Errors
+This is its most useful feature for debugging.
+
+If you try to destroy a mutex that is currently locked (by any thread), pthread_mutex_destroy will fail and return EBUSY.
+
+This warns you that your logic is flawed: "Hey, you are trying to delete this lock, but someone is still using it!"
+
+3. It Releases Kernel Resources (Sometimes)
+On Linux (Default): A standard mutex is often just a simple counter in user-space memory. In this case, destroy doesn't strictly need to talk to the kernel, so it feels like it does nothing.
+
+On Other Systems / Special Mutexes: If you use "recursive" or "error-checking" mutexes, or if you are on an OS closer to Windows, the mutex might have a hidden handle or a pointer to a kernel object. pthread_mutex_destroy is responsible for telling the kernel: "We are done with this handle, you can free it." If you skip this, you leak kernel resources.
+
+Why brk(heapStart) made it irrelevant for you
+In your specific case, your mutexes live inside your Header structs, which live in the heap.
+
+You called brk(heapStart), effectively telling the OS "I don't need this memory anymore."
+
+The OS reclaimed the pages.
+
+The mutexes inside those pages ceased to exist.
+
+Since the process was ending (or the heap was being reset), the OS cleans up all kernel resources associated with the process anyway. You didn't see an error because you bypassed the safety check (destroy) and just deleted the universe the mutex lived in.
+
+The Verdict for Your Assignment
+
+Is it required? Yes. In a C/C++ course or real-world system programming, relying on brk or process exit to clean up is considered "sloppy."
+
+How to fix: Before you call heapKill or brk(heapStart), you should iterate through your headerList one last time and call pthread_mutex_destroy(&current->mutex) for every block.
+
+Would you like me to write that "cleanup loop" function for you?

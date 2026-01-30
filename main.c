@@ -1,24 +1,9 @@
 #include "customAllocator.h"
-#include "tests.h"
 
-int main2();
+extern void test_handler();
 
 int main() {
 	printf("hello\n");
-    heapCreate();
-    testBasic1();
-    testBasic2();
-    testGapAtStart();
-    testBestFit();
-    testCalloc();
-    testRealloc();
-    testFreeErr();
-    heapKill();
-    heapCreate();
-    testMTMallocFree();
-    heapKill();
-    heapCreate();
-    main2();
-    heapKill();
+    test_handler();
     return 0;
 }
