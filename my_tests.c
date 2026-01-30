@@ -312,7 +312,7 @@ void* threadCallocRoutine(void* arg){
     int nmemb = 10;
     int size = sizeof(int);
     int* arr = (int*)customMTCalloc(nmemb, size);
-    printf("Thread %lu: Allocated array of %d elements of size %d at %p\n in region %d\n", pthread_self(), nmemb, size, arr, getRegionIndexByAdress((Header*)((size_t)arr - sizeof(Header))));
+    printf("Thread %lu: Allocated array of %d elements of size %d at %p\n in region %d\n", pthread_self(), nmemb, size, (void*)arr, getRegionIndexByAdress((Header*)((size_t)arr - sizeof(Header))));
     //check that all elements are zero
     bool allZero = true;
     for(int i = 0; i < nmemb; i++){
@@ -323,6 +323,6 @@ void* threadCallocRoutine(void* arg){
     }
     printf("Thread %lu: All elements initialized to zero: %s\n", pthread_self(), allZero ? "true" : "false");
     customMTFree(arr);
-    printf("Thread %lu: Freed array at %p\n in region %d\n", pthread_self(), arr, getRegionIndexByAdress((Header*)((size_t)arr - sizeof(Header))));
+    printf("Thread %lu: Freed array at %p\n in region %d\n", pthread_self(), (void*)arr, getRegionIndexByAdress((Header*)((size_t)arr - sizeof(Header))));
     return NULL;
 }
