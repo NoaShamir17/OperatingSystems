@@ -20,6 +20,7 @@ void testMTMallocFree();
 void* threadAllocFreeRoutine(void* arg);
 //tests multi-threaded realloc by having each thread allocate several blocks,
 //then realloc each block to a new random size, then free all blocks.
+//we check it doesnt crash
 void testMTRealloc();
 void* threadReallocRoutine(void* arg);
 
